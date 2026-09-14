@@ -1,0 +1,82 @@
+[
+  {
+    "id": "sub_1789370651542_m1to",
+    "quiz_id": "quiz_1789370618450_9pvj",
+    "student_name": "CongCong",
+    "score": 1,
+    "total_questions": 10,
+    "answers": [
+      {
+        "question_id": "q_1789370618450_0",
+        "question_text": "On a farm, the farmer harvested 30.7 crates of apples and 27.9 crates of oranges. How much more crates of apples are harvested?",
+        "selected_index": 0,
+        "correct_index": 2,
+        "is_correct": false
+      },
+      {
+        "question_id": "q_1789370618450_1",
+        "question_text": "A birch tree (pohon burja/berek) outside the farm is 3.5 meters tall. The pine tree is 5.4 meters tall. The maple tree is 1.1 meter taller than the birch tree. Which is taller, the maple tree or the pine tree?",
+        "selected_index": 3,
+        "correct_index": 0,
+        "is_correct": false
+      },
+      {
+        "question_id": "q_1789370618450_2",
+        "question_text": "Farmer Farhan uses 9.5 bags of fertilizer for the pumpkin field. He uses 0.7 more bags of fertilizers for the tomato field. Compared to the tomato field, he uses 1.3 less bags of fertilizers for the cabbage field. How many bags of fertilizers does he use for the cabbage field?",
+        "selected_index": 2,
+        "correct_index": 2,
+        "is_correct": true
+      },
+      {
+        "question_id": "q_1789370618450_3",
+        "question_text": "The price for pumpkin last year is $1.40 per kilogram. The price for pumpkin this year is increased by $0.80 per kilogram. What is the price for pumpkin this year?",
+        "selected_index": 2,
+        "correct_index": 3,
+        "is_correct": false
+      },
+      {
+        "question_id": "q_1789370618450_4",
+        "question_text": "The distance between the farm and downtown is 14.8 km, and the distance between the farm and farmer's market is 18.4 km. Is the farm closer to downtown or the farmer's market?",
+        "selected_index": 3,
+        "correct_index": 1,
+        "is_correct": false
+      },
+      {
+        "question_id": "q_1789370618450_5",
+        "question_text": "Look at the number below! 56.78 What is the place value of 6 and 8?",
+        "selected_index": 3,
+        "correct_index": 2,
+        "is_correct": false
+      },
+      {
+        "question_id": "q_1789370618450_6",
+        "question_text": "Farmer Joe has 12.4 acres of land. He uses 4.5 acres of land for growing fruits and 6.1 acres of land for growing vegetables. How much land does he have left to use?",
+        "selected_index": 1,
+        "correct_index": 3,
+        "is_correct": false
+      },
+      {
+        "question_id": "q_1789370618450_7",
+        "question_text": "Round to the whole number below! * 26.48",
+        "selected_index": 3,
+        "correct_index": 2,
+        "is_correct": false
+      },
+      {
+        "question_id": "q_1789370618450_8",
+        "question_text": "Questions number 9 – 10. Please find the number that suits the blank of A! (a 23.45 = 23 + _______)",
+        "selected_index": 3,
+        "correct_index": 2,
+        "is_correct": false
+      },
+      {
+        "question_id": "q_1789370618450_9",
+        "question_text": "Please find the number that suits the blank of C ! * (Referring to: c 10 + _______ + 0.05 = 23.45)",
+        "selected_index": 3,
+        "correct_index": 1,
+        "is_correct": false
+      }
+    ],
+    "completed_at": "2026-09-14T07:24:11.542Z"
+  }
+]

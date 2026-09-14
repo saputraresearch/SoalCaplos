@@ -1,0 +1,834 @@
+[
+  {
+    "quiz": {
+      "id": "quiz_1789373577526_smic",
+      "title": "Kuis 8 Tipe Soal Lengkap",
+      "slug": "kuis-8-tipe-soal-lengkap-wogf0",
+      "created_at": "2026-09-14T08:12:57.526Z",
+      "status": "draft"
+    },
+    "questions": [
+      {
+        "id": "q_1789373577526_0",
+        "quiz_id": "quiz_1789373577526_smic",
+        "question_text": "Apa ibukota Indonesia?",
+        "question_type": "MULTIPLE_CHOICE",
+        "image_url": null,
+        "options": [
+          "Jakarta",
+          "Surabaya",
+          "Bandung",
+          "Medan"
+        ],
+        "correct_answer_index": 0,
+        "correct_answers": [
+          0
+        ],
+        "matching_pairs": [],
+        "reorder_items": [],
+        "correct_order": [],
+        "blanks_keywords": [],
+        "rubric": [],
+        "math_solution": null,
+        "image_context": null,
+        "label_targets": [],
+        "hotspot_zone": null,
+        "categories": [],
+        "categorize_items": [],
+        "explanation": "Jakarta adalah ibukota saat ini.",
+        "order_index": 0
+      },
+      {
+        "id": "q_1789373577526_1",
+        "quiz_id": "quiz_1789373577526_smic",
+        "question_text": "Pilih hewan mamalia (pilih 2-4 yang benar):",
+        "question_type": "MULTIPLE_SELECT",
+        "image_url": null,
+        "options": [
+          "Kucing",
+          "Lumba-lumba",
+          "Ayam",
+          "Paus",
+          "Katak"
+        ],
+        "correct_answer_index": 0,
+        "correct_answers": [
+          0,
+          1
+        ],
+        "matching_pairs": [],
+        "reorder_items": [],
+        "correct_order": [],
+        "blanks_keywords": [],
+        "rubric": [],
+        "math_solution": null,
+        "image_context": null,
+        "label_targets": [],
+        "hotspot_zone": null,
+        "categories": [],
+        "categorize_items": [],
+        "explanation": "Kucing, lumba-lumba, dan paus adalah mamalia.",
+        "order_index": 1
+      },
+      {
+        "id": "q_1789373577526_2",
+        "quiz_id": "quiz_1789373577526_smic",
+        "question_text": "Matahari terbit dari sebelah barat.",
+        "question_type": "MULTIPLE_CHOICE",
+        "image_url": null,
+        "options": [
+          "Benar",
+          "Salah"
+        ],
+        "correct_answer_index": 1,
+        "correct_answers": [
+          1
+        ],
+        "matching_pairs": [],
+        "reorder_items": [],
+        "correct_order": [],
+        "blanks_keywords": [],
+        "rubric": [],
+        "math_solution": null,
+        "image_context": null,
+        "label_targets": [],
+        "hotspot_zone": null,
+        "categories": [],
+        "categorize_items": [],
+        "explanation": "Matahari terbit dari sebelah timur.",
+        "order_index": 2
+      },
+      {
+        "id": "q_1789373577526_3",
+        "quiz_id": "quiz_1789373577526_smic",
+        "question_text": "Jodohkan negara dengan ibukotanya:",
+        "question_type": "MULTIPLE_CHOICE",
+        "image_url": null,
+        "options": [],
+        "correct_answer_index": 0,
+        "correct_answers": [
+          0
+        ],
+        "matching_pairs": [],
+        "reorder_items": [],
+        "correct_order": [],
+        "blanks_keywords": [],
+        "rubric": [],
+        "math_solution": null,
+        "image_context": null,
+        "label_targets": [],
+        "hotspot_zone": null,
+        "categories": [],
+        "categorize_items": [],
+        "explanation": "Pasangan negara dan ibukota.",
+        "order_index": 3
+      },
+      {
+        "id": "q_1789373577526_4",
+        "quiz_id": "quiz_1789373577526_smic",
+        "question_text": "Urutkan siklus metamorfosis kupu-kupu:",
+        "question_type": "MULTIPLE_CHOICE",
+        "image_url": null,
+        "options": [],
+        "correct_answer_index": 0,
+        "correct_answers": [
+          0
+        ],
+        "matching_pairs": [],
+        "reorder_items": [],
+        "correct_order": [],
+        "blanks_keywords": [],
+        "rubric": [],
+        "math_solution": null,
+        "image_context": null,
+        "label_targets": [],
+        "hotspot_zone": null,
+        "categories": [],
+        "categorize_items": [],
+        "explanation": "Siklus metamorfosis sempurna.",
+        "order_index": 4
+      },
+      {
+        "id": "q_1789373577526_5",
+        "quiz_id": "quiz_1789373577526_smic",
+        "question_text": "Proses fotosintesis menghasilkan zat gula dan gas [___].",
+        "question_type": "MULTIPLE_CHOICE",
+        "image_url": null,
+        "options": [
+          "oksigen"
+        ],
+        "correct_answer_index": 0,
+        "correct_answers": [
+          0
+        ],
+        "matching_pairs": [],
+        "reorder_items": [],
+        "correct_order": [],
+        "blanks_keywords": [],
+        "rubric": [],
+        "math_solution": null,
+        "image_context": null,
+        "label_targets": [],
+        "hotspot_zone": null,
+        "categories": [],
+        "categorize_items": [],
+        "explanation": "Fotosintesis menghasilkan oksigen.",
+        "order_index": 5
+      },
+      {
+        "id": "q_1789373577526_6",
+        "quiz_id": "quiz_1789373577526_smic",
+        "question_text": "Jelaskan mengapa keanekaragaman hayati penting bagi keseimbangan ekosistem!",
+        "question_type": "MULTIPLE_SELECT",
+        "image_url": null,
+        "options": [
+          "Pilihan A",
+          "Pilihan B",
+          "Pilihan C",
+          "Pilihan D",
+          "Pilihan relevan 5"
+        ],
+        "correct_answer_index": 0,
+        "correct_answers": [
+          0,
+          1
+        ],
+        "matching_pairs": [],
+        "reorder_items": [],
+        "correct_order": [],
+        "blanks_keywords": [],
+        "rubric": [],
+        "math_solution": null,
+        "image_context": null,
+        "label_targets": [],
+        "hotspot_zone": null,
+        "categories": [],
+        "categorize_items": [],
+        "explanation": "Keanekaragaman menjaga rantai makanan dan kestabilan ekosistem.",
+        "order_index": 6
+      },
+      {
+        "id": "q_1789373577526_7",
+        "quiz_id": "quiz_1789373577526_smic",
+        "question_text": "Hitunglah nilai x dari persamaan: 4x + 12 = 36 adalah x = 6.",
+        "question_type": "TRUE_OR_FALSE",
+        "image_url": null,
+        "options": [
+          "Benar",
+          "Salah"
+        ],
+        "correct_answer_index": 0,
+        "correct_answers": [
+          0
+        ],
+        "matching_pairs": [],
+        "reorder_items": [],
+        "correct_order": [],
+        "blanks_keywords": [],
+        "rubric": [],
+        "math_solution": null,
+        "image_context": null,
+        "label_targets": [],
+        "hotspot_zone": null,
+        "categories": [],
+        "categorize_items": [],
+        "explanation": "Penyelesaian aljabar linier satu variabel.",
+        "order_index": 7
+      },
+      {
+        "id": "q_1789376735565_1",
+        "quiz_id": "quiz_1789373577526_smic",
+        "question_text": "Bibi membeli 35 buah apel. Kemudian, paman memberinya lagi 18 buah apel. Berapa total apel yang Bibi miliki sekarang?",
+        "question_type": "MULTIPLE_CHOICE",
+        "image_url": null,
+        "options": [
+          "51",
+          "53",
+          "43",
+          "48"
+        ],
+        "correct_answer_index": 1,
+        "correct_answers": [
+          0
+        ],
+        "matching_pairs": [],
+        "reorder_items": [],
+        "correct_order": [],
+        "blanks_keywords": [],
+        "rubric": [],
+        "math_solution": null,
+        "image_context": null,
+        "label_targets": [],
+        "hotspot_zone": null,
+        "categories": [],
+        "categorize_items": [],
+        "explanation": "Untuk mencari total apel, kita jumlahkan 35 buah apel dengan 18 buah apel. 35 + 18 = 53. Jadi, Bibi sekarang memiliki 53 buah apel.",
+        "order_index": 8
+      },
+      {
+        "id": "q_1789376735565_2",
+        "quiz_id": "quiz_1789373577526_smic",
+        "question_text": "Pilihlah pernyataan yang benar mengenai angka 48:",
+        "question_type": "MULTIPLE_SELECT",
+        "image_url": null,
+        "options": [
+          "Angka 48 lebih kecil dari 50.",
+          "Angka 48 merupakan hasil dari 6 x 7.",
+          "Angka 48 adalah bilangan genap.",
+          "Angka 48 jika dikurangi 8 hasilnya 40.",
+          "Angka 48 merupakan hasil dari 8 x 6."
+        ],
+        "correct_answer_index": 0,
+        "correct_answers": [
+          0,
+          2,
+          3,
+          4
+        ],
+        "matching_pairs": [],
+        "reorder_items": [],
+        "correct_order": [],
+        "blanks_keywords": [],
+        "rubric": [],
+        "math_solution": null,
+        "image_context": null,
+        "label_targets": [],
+        "hotspot_zone": null,
+        "categories": [],
+        "categorize_items": [],
+        "explanation": "Pernyataan 'Angka 48 lebih kecil dari 50' adalah benar. 'Angka 48 adalah bilangan genap' adalah benar karena angka terakhirnya 8. 'Angka 48 jika dikurangi 8 hasilnya 40' adalah benar karena 48 - 8 = 40. 'Angka 48 merupakan hasil dari 8 x 6' adalah benar karena 8 x 6 = 48. Pernyataan 'Angka 48 merupakan hasil dari 6 x 7' adalah salah, karena 6 x 7 = 42.",
+        "order_index": 9
+      },
+      {
+        "id": "q_1789376735565_3",
+        "quiz_id": "quiz_1789373577526_smic",
+        "question_text": "Jika kamu memiliki 20 permen dan membaginya sama rata kepada 4 temanmu, setiap teman akan mendapatkan 5 permen.",
+        "question_type": "TRUE_OR_FALSE",
+        "image_url": null,
+        "options": [
+          "Benar",
+          "Salah"
+        ],
+        "correct_answer_index": 0,
+        "correct_answers": [
+          0
+        ],
+        "matching_pairs": [],
+        "reorder_items": [],
+        "correct_order": [],
+        "blanks_keywords": [],
+        "rubric": [],
+        "math_solution": null,
+        "image_context": null,
+        "label_targets": [],
+        "hotspot_zone": null,
+        "categories": [],
+        "categorize_items": [],
+        "explanation": "Untuk mengetahui kebenarannya, kita hitung 20 dibagi 4. Hasilnya adalah 5. Jadi, pernyataan tersebut Benar.",
+        "order_index": 10
+      },
+      {
+        "id": "q_1789376735565_4",
+        "quiz_id": "quiz_1789373577526_smic",
+        "question_text": "Pasangkan operasi hitung dengan hasil yang tepat!",
+        "question_type": "MATCHING",
+        "image_url": null,
+        "options": [],
+        "correct_answer_index": 0,
+        "correct_answers": [
+          0
+        ],
+        "matching_pairs": [
+          {
+            "left": "7 + 6",
+            "right": "13"
+          },
+          {
+            "left": "20 - 9",
+            "right": "11"
+          },
+          {
+            "left": "4 x 5",
+            "right": "20"
+          },
+          {
+            "left": "18 : 3",
+            "right": "6"
+          }
+        ],
+        "reorder_items": [],
+        "correct_order": [],
+        "blanks_keywords": [],
+        "rubric": [],
+        "math_solution": null,
+        "image_context": null,
+        "label_targets": [],
+        "hotspot_zone": null,
+        "categories": [],
+        "categorize_items": [],
+        "explanation": "7 + 6 = 13; 20 - 9 = 11; 4 x 5 = 20; 18 : 3 = 6.",
+        "order_index": 11
+      },
+      {
+        "id": "q_1789376735565_5",
+        "quiz_id": "quiz_1789373577526_smic",
+        "question_text": "Urutkan langkah-langkah untuk menyelesaikan soal cerita ini: 'Rudi punya 12 kelereng, lalu dia membeli lagi 5 kelereng. Berapa total kelereng Rudi sekarang?'",
+        "question_type": "REORDER",
+        "image_url": null,
+        "options": [],
+        "correct_answer_index": 0,
+        "correct_answers": [
+          0
+        ],
+        "matching_pairs": [],
+        "reorder_items": [
+          "Tambahkan jumlah kelereng awal dengan jumlah kelereng yang dibeli.",
+          "Tentukan apa yang ditanyakan dalam soal.",
+          "Baca soal cerita dengan seksama.",
+          "Tuliskan jawaban total kelereng yang didapat Rudi."
+        ],
+        "correct_order": [
+          2,
+          1,
+          0,
+          3
+        ],
+        "blanks_keywords": [],
+        "rubric": [],
+        "math_solution": null,
+        "image_context": null,
+        "label_targets": [],
+        "hotspot_zone": null,
+        "categories": [],
+        "categorize_items": [],
+        "explanation": "Urutan langkah yang benar adalah: Baca soal cerita, tentukan apa yang ditanyakan, lakukan perhitungan (penjumlahan), lalu tuliskan jawaban total kelereng yang didapat Rudi.",
+        "order_index": 12
+      },
+      {
+        "id": "q_1789376735565_6",
+        "quiz_id": "quiz_1789373577526_smic",
+        "question_text": "Lengkapi kalimat matematika berikut: Ibu memiliki 2 lusin pensil. 1 lusin adalah 12 buah. Jadi, total pensil Ibu adalah [___] buah. Jika Ibu memberikan 5 pensil kepada adik, maka sisa pensil Ibu sekarang adalah [___] buah.",
+        "question_type": "FILL_IN_THE_BLANKS",
+        "image_url": null,
+        "options": [],
+        "correct_answer_index": 0,
+        "correct_answers": [
+          0
+        ],
+        "matching_pairs": [],
+        "reorder_items": [],
+        "correct_order": [],
+        "blanks_keywords": [
+          "24",
+          "19"
+        ],
+        "rubric": [],
+        "math_solution": null,
+        "image_context": null,
+        "label_targets": [],
+        "hotspot_zone": null,
+        "categories": [],
+        "categorize_items": [],
+        "explanation": "1 lusin = 12 buah. Jadi 2 lusin = 2 x 12 = 24 buah pensil. Jika diberikan 5 pensil, maka 24 - 5 = 19 buah pensil.",
+        "order_index": 13
+      }
+    ]
+  },
+  {
+    "quiz": {
+      "id": "quiz_1789370618450_9pvj",
+      "title": "MATH HOMEWORK 2 DECIMALS 2026",
+      "slug": "math-homework-2-decimals-2026-v7ug7",
+      "created_at": "2026-09-14T07:23:38.450Z",
+      "status": "draft"
+    },
+    "questions": [
+      {
+        "id": "q_1789370618450_0",
+        "quiz_id": "quiz_1789370618450_9pvj",
+        "question_text": "On a farm, the farmer harvested 30.7 crates of apples and 27.9 crates of oranges. How much more crates of apples are harvested?",
+        "question_type": "MULTIPLE_CHOICE",
+        "image_url": null,
+        "options": [
+          "A. 1.3",
+          "B. 2.6",
+          "C. 2.8",
+          "D. 3.6"
+        ],
+        "correct_answer_index": 2,
+        "correct_answers": [
+          2
+        ],
+        "matching_pairs": [],
+        "reorder_items": [],
+        "correct_order": [],
+        "blanks_keywords": [],
+        "rubric": [],
+        "math_solution": null,
+        "image_context": null,
+        "label_targets": [],
+        "hotspot_zone": null,
+        "categories": [],
+        "categorize_items": [],
+        "explanation": null,
+        "order_index": 0
+      },
+      {
+        "id": "q_1789370618450_0",
+        "quiz_id": "quiz_1789370618450_9pvj",
+        "question_text": "On a farm, the farmer harvested 30.7 crates of apples and 27.9 crates of oranges. How much more crates of apples are harvested? Soal 2 duplicaate",
+        "question_type": "MULTIPLE_CHOICE",
+        "image_url": null,
+        "options": [
+          "A. 1.3",
+          "B. 2.6",
+          "C. 2.8",
+          "D. 3.6"
+        ],
+        "correct_answer_index": 2,
+        "correct_answers": [
+          2
+        ],
+        "matching_pairs": [],
+        "reorder_items": [],
+        "correct_order": [],
+        "blanks_keywords": [],
+        "rubric": [],
+        "math_solution": null,
+        "image_context": null,
+        "label_targets": [],
+        "hotspot_zone": null,
+        "categories": [],
+        "categorize_items": [],
+        "explanation": null,
+        "order_index": 1
+      },
+      {
+        "id": "q_1789370618450_1",
+        "quiz_id": "quiz_1789370618450_9pvj",
+        "question_text": "A birch tree (pohon burja/berek) outside the farm is 3.5 meters tall. The pine tree is 5.4 meters tall. The maple tree is 1.1 meter taller than the birch tree. Which is taller, the maple tree or the pine tree?",
+        "question_type": "MULTIPLE_CHOICE",
+        "image_url": null,
+        "options": [
+          "A. The pine tree is taller. It is 5.4 m.",
+          "B. The birch tree is taller. It is 5.4 m.",
+          "C. The pine tree is shorter. It is 3.5 m.",
+          "D. The birch tree is shorter. It is 1.1 m."
+        ],
+        "correct_answer_index": 0,
+        "correct_answers": [
+          0
+        ],
+        "matching_pairs": [],
+        "reorder_items": [],
+        "correct_order": [],
+        "blanks_keywords": [],
+        "rubric": [],
+        "math_solution": null,
+        "image_context": null,
+        "label_targets": [],
+        "hotspot_zone": null,
+        "categories": [],
+        "categorize_items": [],
+        "explanation": null,
+        "order_index": 2
+      },
+      {
+        "id": "q_1789370618450_2",
+        "quiz_id": "quiz_1789370618450_9pvj",
+        "question_text": "Farmer Farhan uses 9.5 bags of fertilizer for the pumpkin field. He uses 0.7 more bags of fertilizers for the tomato field. Compared to the tomato field, he uses 1.3 less bags of fertilizers for the cabbage field. How many bags of fertilizers does he use for the cabbage field?",
+        "question_type": "MULTIPLE_CHOICE",
+        "image_url": null,
+        "options": [
+          "A. 8.6 bags",
+          "B. 8.7 bags",
+          "C. 8.9 bags",
+          "D. 9.0 bags"
+        ],
+        "correct_answer_index": 2,
+        "correct_answers": [
+          2
+        ],
+        "matching_pairs": [],
+        "reorder_items": [],
+        "correct_order": [],
+        "blanks_keywords": [],
+        "rubric": [],
+        "math_solution": null,
+        "image_context": null,
+        "label_targets": [],
+        "hotspot_zone": null,
+        "categories": [],
+        "categorize_items": [],
+        "explanation": null,
+        "order_index": 3
+      },
+      {
+        "id": "q_1789370618450_3",
+        "quiz_id": "quiz_1789370618450_9pvj",
+        "question_text": "The price for pumpkin last year is $1.40 per kilogram. The price for pumpkin this year is increased by $0.80 per kilogram. What is the price for pumpkin this year?",
+        "question_type": "MULTIPLE_CHOICE",
+        "image_url": null,
+        "options": [
+          "A. 1.2",
+          "B. 1.4",
+          "C. 2.1",
+          "D. 2.2"
+        ],
+        "correct_answer_index": 3,
+        "correct_answers": [
+          3
+        ],
+        "matching_pairs": [],
+        "reorder_items": [],
+        "correct_order": [],
+        "blanks_keywords": [],
+        "rubric": [],
+        "math_solution": null,
+        "image_context": null,
+        "label_targets": [],
+        "hotspot_zone": null,
+        "categories": [],
+        "categorize_items": [],
+        "explanation": null,
+        "order_index": 4
+      },
+      {
+        "id": "q_1789370618450_4",
+        "quiz_id": "quiz_1789370618450_9pvj",
+        "question_text": "The distance between the farm and downtown is 14.8 km, and the distance between the farm and farmer's market is 18.4 km. Is the farm closer to downtown or the farmer's market?",
+        "question_type": "MULTIPLE_CHOICE",
+        "image_url": null,
+        "options": [
+          "A. The farm is farther to downtown",
+          "B. The farm is closer to downtown",
+          "C. Th farm is as close as to downtown and the market",
+          "D. The downtown is as close as the farm to the market"
+        ],
+        "correct_answer_index": 1,
+        "correct_answers": [
+          1
+        ],
+        "matching_pairs": [],
+        "reorder_items": [],
+        "correct_order": [],
+        "blanks_keywords": [],
+        "rubric": [],
+        "math_solution": null,
+        "image_context": null,
+        "label_targets": [],
+        "hotspot_zone": null,
+        "categories": [],
+        "categorize_items": [],
+        "explanation": null,
+        "order_index": 5
+      },
+      {
+        "id": "q_1789370618450_5",
+        "quiz_id": "quiz_1789370618450_9pvj",
+        "question_text": "Look at the number below! 56.78 What is the place value of 6 and 8?",
+        "question_type": "MULTIPLE_CHOICE",
+        "image_url": null,
+        "options": [
+          "A. 6 is in tenths, 8 is in ones",
+          "B. 6 is in ones, 8 is in tenths",
+          "C. 6 is in ones, 8 is in hundredths",
+          "D. 6 is in tens, 8 is in ones"
+        ],
+        "correct_answer_index": 2,
+        "correct_answers": [
+          2
+        ],
+        "matching_pairs": [],
+        "reorder_items": [],
+        "correct_order": [],
+        "blanks_keywords": [],
+        "rubric": [],
+        "math_solution": null,
+        "image_context": null,
+        "label_targets": [],
+        "hotspot_zone": null,
+        "categories": [],
+        "categorize_items": [],
+        "explanation": null,
+        "order_index": 6
+      },
+      {
+        "id": "q_1789370618450_6",
+        "quiz_id": "quiz_1789370618450_9pvj",
+        "question_text": "Farmer Joe has 12.4 acres of land. He uses 4.5 acres of land for growing fruits and 6.1 acres of land for growing vegetables. How much land does he have left to use?",
+        "question_type": "MULTIPLE_CHOICE",
+        "image_url": null,
+        "options": [
+          "A. 1.3",
+          "B. 1.4",
+          "C. 1.5",
+          "D. 1.8"
+        ],
+        "correct_answer_index": 3,
+        "correct_answers": [
+          3
+        ],
+        "matching_pairs": [],
+        "reorder_items": [],
+        "correct_order": [],
+        "blanks_keywords": [],
+        "rubric": [],
+        "math_solution": null,
+        "image_context": null,
+        "label_targets": [],
+        "hotspot_zone": null,
+        "categories": [],
+        "categorize_items": [],
+        "explanation": null,
+        "order_index": 7
+      },
+      {
+        "id": "q_1789370618450_7",
+        "quiz_id": "quiz_1789370618450_9pvj",
+        "question_text": "Round to the whole number below! * 26.48",
+        "question_type": "MULTIPLE_CHOICE",
+        "image_url": null,
+        "options": [
+          "A. 23.00",
+          "B. 25.40",
+          "C. 26.00",
+          "D. 27.00"
+        ],
+        "correct_answer_index": 2,
+        "correct_answers": [
+          2
+        ],
+        "matching_pairs": [],
+        "reorder_items": [],
+        "correct_order": [],
+        "blanks_keywords": [],
+        "rubric": [],
+        "math_solution": null,
+        "image_context": null,
+        "label_targets": [],
+        "hotspot_zone": null,
+        "categories": [],
+        "categorize_items": [],
+        "explanation": null,
+        "order_index": 8
+      },
+      {
+        "id": "q_1789370618450_8",
+        "quiz_id": "quiz_1789370618450_9pvj",
+        "question_text": "Questions number 9 – 10. Please find the number that suits the blank of A! (a 23.45 = 23 + _______)",
+        "question_type": "MULTIPLE_CHOICE",
+        "image_url": null,
+        "options": [
+          "A. 0.35",
+          "B. 0.34",
+          "C. 0.45",
+          "D. 0.54"
+        ],
+        "correct_answer_index": 2,
+        "correct_answers": [
+          2
+        ],
+        "matching_pairs": [],
+        "reorder_items": [],
+        "correct_order": [],
+        "blanks_keywords": [],
+        "rubric": [],
+        "math_solution": null,
+        "image_context": null,
+        "label_targets": [],
+        "hotspot_zone": null,
+        "categories": [],
+        "categorize_items": [],
+        "explanation": null,
+        "order_index": 9
+      },
+      {
+        "id": "q_1789370618450_9",
+        "quiz_id": "quiz_1789370618450_9pvj",
+        "question_text": "Please find the number that suits the blank of C ! * (Referring to: c 10 + _______ + 0.05 = 23.45)",
+        "question_type": "MULTIPLE_CHOICE",
+        "image_url": null,
+        "options": [
+          "A. 12.35",
+          "B. 13.40",
+          "C. 13.45",
+          "D. 13.54"
+        ],
+        "correct_answer_index": 1,
+        "correct_answers": [
+          1
+        ],
+        "matching_pairs": [],
+        "reorder_items": [],
+        "correct_order": [],
+        "blanks_keywords": [],
+        "rubric": [],
+        "math_solution": null,
+        "image_context": null,
+        "label_targets": [],
+        "hotspot_zone": null,
+        "categories": [],
+        "categorize_items": [],
+        "explanation": null,
+        "order_index": 10
+      },
+      {
+        "id": "q_1789372475320_11",
+        "quiz_id": "quiz_1789370618450_9pvj",
+        "question_text": "Kamu adalah buatan AI. benar gak ? ",
+        "question_type": "MULTIPLE_CHOICE",
+        "image_url": null,
+        "options": [
+          "True",
+          "False"
+        ],
+        "correct_answer_index": 0,
+        "correct_answers": [
+          0
+        ],
+        "matching_pairs": [],
+        "reorder_items": [],
+        "correct_order": [],
+        "blanks_keywords": [],
+        "rubric": [],
+        "math_solution": null,
+        "image_context": null,
+        "label_targets": [],
+        "hotspot_zone": null,
+        "categories": [],
+        "categorize_items": [],
+        "explanation": null,
+        "order_index": 11
+      },
+      {
+        "id": "q_1789373122303_12",
+        "quiz_id": "quiz_1789370618450_9pvj",
+        "question_text": "New True / False Question asad asda das",
+        "question_type": "MULTIPLE_CHOICE",
+        "image_url": null,
+        "options": [
+          "True",
+          "False"
+        ],
+        "correct_answer_index": 1,
+        "correct_answers": [
+          1
+        ],
+        "matching_pairs": [],
+        "reorder_items": [],
+        "correct_order": [],
+        "blanks_keywords": [],
+        "rubric": [],
+        "math_solution": null,
+        "image_context": null,
+        "label_targets": [],
+        "hotspot_zone": null,
+        "categories": [],
+        "categorize_items": [],
+        "explanation": null,
+        "order_index": 12
+      }
+    ]
+  }
+]
