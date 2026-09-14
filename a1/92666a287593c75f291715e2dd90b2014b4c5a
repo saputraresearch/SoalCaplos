@@ -1,0 +1,19 @@
+src/app/globals.css
+  s_8b92f1e0230518::t_243a01280486c3 1-35
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "a192666a287593c75f291715e2dd90b2014b4c5a",
+  "prompts": {},
+  "sessions": {
+    "s_8b92f1e0230518": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "814ec10c-5de9-4a4d-b7ee-fa3422c94f87",
+        "model": "claude-opus-5"
+      },
+      "human_author": "saputra.a.pratama <saputra.a.pratama@gdn-commerce.com>"
+    }
+  }
+}
