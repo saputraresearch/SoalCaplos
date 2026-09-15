@@ -32,6 +32,7 @@ import { createDefaultQuestion } from "@/lib/questionTemplates";
 import { reportClientError } from "@/components/ErrorTelemetry";
 import { safeParseResponseJson } from "@/lib/apiResponse";
 import ExtractionFlowPanel, { type ExtractionStep } from "@/components/ExtractionFlowPanel";
+import { parseQuizWithClientDirect } from "@/lib/clientAiExtractor";
 
 
 export default function CreateQuizPage() {
@@ -223,6 +224,79 @@ export default function CreateQuizPage() {
     }
 
     try {
+      // -------------------------------------------------------------
+      // IDE 1: CLIENT-SIDE DIRECT CALL (Bypass Vercel AWS IP Limits)
+      // -------------------------------------------------------------
+      // 1. Ekstraksi teks digital lokal secara instan (<50ms)
+      try {
+        const textFormData = new FormData();
+        textFormData.append("file", file);
+        if (customOcrKey) textFormData.append("ocr_api_key", customOcrKey);
+
+        const extractHeaders: Record<string, string> = {};
+        if (customOcrKey) extractHeaders["x-ocrspace-api-key"] = customOcrKey;
+
+        const extractRes = await fetch("/api/extract-text", {
+          method: "POST",
+          headers: extractHeaders,
+          body: textFormData,
+        });
+
+        const extractData = await extractRes.json().catch(() => ({}));
+        if (Array.isArray(extractData?.extractionSteps)) {
+          setExtractionSteps(extractData.extractionSteps);
+        }
+
+        if (extractData?.success && extractData?.hasDigitalText && extractData?.fullText) {
+          // 2. Browser laptop langsung memanggil Gemini / Groq (IP Residential)
+          const geminiKeysList = customApiKey
+            ? customApiKey.split(/[\s,\n;]+/).filter(Boolean)
+            : [];
+
+          const clientAiResult = await parseQuizWithClientDirect({
+            fullText: extractData.fullText,
+            geminiKeys: geminiKeysList,
+            groqKey: customGroqKey,
+            preferredProvider: customProvider,
+            preferredModel: customModel,
+            onStep: (newStep) => {
+              setExtractionSteps((prev) => {
+                const filtered = prev.filter((s) => s.id !== newStep.id);
+                return [...filtered, newStep];
+              });
+            },
+          });
+
+          if (clientAiResult.success && clientAiResult.questions && clientAiResult.questions.length > 0) {
+            setQuizTitle(clientAiResult.title || file.name.replace(/\.[^/.]+$/, ""));
+            const extractedQuestions = clientAiResult.questions;
+            setQuestions(extractedQuestions);
+
+            const fillInCount = extractedQuestions.filter((q: any) => q.question_type === "FILL_IN_THE_BLANKS").length;
+            const mcqCount = extractedQuestions.filter((q: any) => !q.question_type || q.question_type === "MULTIPLE_CHOICE").length;
+            const otherCount = extractedQuestions.length - fillInCount - mcqCount;
+            const typeSummary: string[] = [];
+            if (fillInCount > 0) typeSummary.push(`${fillInCount} isian`);
+            if (mcqCount > 0) typeSummary.push(`${mcqCount} pilihan ganda`);
+            if (otherCount > 0) typeSummary.push(`${otherCount} tipe lainnya`);
+
+            const extraInfo = typeSummary.filter(Boolean).join(", ");
+            const providerName = clientAiResult.provider === "gemini" ? "Google Gemini (Koneksi Langsung Browser)" : "Groq AI";
+            setToastMessage(
+              `✨ Berhasil mengekstrak ${extractedQuestions.length} butir soal via ${providerName}${extraInfo ? ` (${extraInfo})` : ""}!`
+            );
+            setTimeout(() => setToastMessage(null), 5000);
+            setIsParsing(false);
+            return;
+          }
+        }
+      } catch (clientDirectErr) {
+        console.warn("[ClientDirect] Browser call failed, falling back to server:", clientDirectErr);
+      }
+
+      // -------------------------------------------------------------
+      // FALLBACK: Serverless /api/parse-pdf
+      // -------------------------------------------------------------
       const headers: Record<string, string> = {};
       if (customApiKey) {
         headers["x-gemini-api-key"] = customApiKey;
