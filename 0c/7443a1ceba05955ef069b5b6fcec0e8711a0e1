@@ -1,0 +1,25 @@
+src/app/admin/create/page.tsx
+  s_fedd3be96b4dd0::t_e2fbff831de516 33,134-141,161-167,172-188,214,216-222,225,228-229,403-405,407,471-473,475
+src/components/SettingsModal.tsx
+  s_fedd3be96b4dd0::t_bde312a8e31931 12-15,20,26,28-33,36,38-39
+src/lib/apiResponse.ts
+  s_fedd3be96b4dd0::t_c2873c704e82ad 1-65
+src/lib/geminiModels.ts
+  s_fedd3be96b4dd0::t_7d70e1e4fd6f94 1-20,30,34-37,40,42-43,53,64,79-80,85,87,92
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "0c7443a1ceba05955ef069b5b6fcec0e8711a0e1",
+  "prompts": {},
+  "sessions": {
+    "s_fedd3be96b4dd0": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "6f90e7ed-6175-4c00-a8b3-03b90ba877f4",
+        "model": "claude-sonnet-5"
+      },
+      "human_author": "saputra.a.pratama <saputra.a.pratama@gdn-commerce.com>"
+    }
+  }
+}
