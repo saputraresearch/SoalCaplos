@@ -1,0 +1,22 @@
+src/app/admin/create/page.tsx
+  h_7310902349a227 198-199,208-210,220-222
+src/app/api/parse-pdf/route.ts
+  h_7310902349a227 6,74-75,160-179
+src/components/SettingsModal.tsx
+  h_7310902349a227 4,21,23,32,34,42,44-45,55,161-192
+src/lib/geminiModels.ts
+  h_7310902349a227 5,7,90,92
+src/lib/ocrSpace.ts
+  h_7310902349a227 1-61
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "798a5aa2e65900b055013f217ca5bc897edf3f19",
+  "prompts": {},
+  "humans": {
+    "h_7310902349a227": {
+      "author": "saputra.a.pratama <saputra.a.pratama@gdn-commerce.com>"
+    }
+  }
+}
