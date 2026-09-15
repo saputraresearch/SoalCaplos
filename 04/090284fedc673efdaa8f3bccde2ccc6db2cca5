@@ -1,0 +1,14 @@
+src/lib/clientAiExtractor.ts
+  h_7310902349a227 7-8,11-34,38-39,81,133-157,159,164-168,170,172,175-197,390,402-481,493-495,501,526-528,534,567-569,575
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "04090284fedc673efdaa8f3bccde2ccc6db2cca5",
+  "prompts": {},
+  "humans": {
+    "h_7310902349a227": {
+      "author": "saputra.a.pratama <saputra.a.pratama@gdn-commerce.com>"
+    }
+  }
+}
