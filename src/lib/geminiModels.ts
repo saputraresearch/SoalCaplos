@@ -2,8 +2,9 @@
  * Helper to normalize and sanitize model names, correcting non-existent or experimental models
  */
 export function normalizeModelName(model?: string | null): string {
-  if (!model) return "gemini-2.0-flash";
+  if (!model) return "gemini-1.5-flash";
   const clean = model.trim().replace(/^models\//, "");
+  if (clean === "gemini-1.5-pro") return "gemini-1.5-pro-latest";
   if (
     clean.includes("3.6") ||
     clean.includes("2.5") ||
@@ -85,10 +86,10 @@ export async function getActiveGeminiModels(
   // Official verified Gemini models on v1beta API
   const fallback = [
     normalizedPreferred,
-    "gemini-2.0-flash",
     "gemini-1.5-flash",
+    "gemini-2.0-flash",
     "gemini-1.5-flash-latest",
-    "gemini-1.5-pro",
+    "gemini-1.5-flash-8b",
     "gemini-1.5-pro-latest",
   ].filter(Boolean) as string[];
 

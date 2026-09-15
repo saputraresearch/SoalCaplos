@@ -195,6 +195,8 @@ export default function CreateQuizPage() {
       }
     }
 
+    const customOcrKey = typeof window !== "undefined" ? localStorage.getItem("quizcaplos_ocrspace_key") || "" : "";
+
     const formData = new FormData();
     formData.append("file", file);
     if (customApiKey) {
@@ -202,6 +204,9 @@ export default function CreateQuizPage() {
     }
     if (customModel) {
       formData.append("model", customModel);
+    }
+    if (customOcrKey) {
+      formData.append("ocr_api_key", customOcrKey);
     }
 
     try {
@@ -211,6 +216,9 @@ export default function CreateQuizPage() {
       }
       if (customModel) {
         headers["x-gemini-model"] = customModel;
+      }
+      if (customOcrKey) {
+        headers["x-ocrspace-api-key"] = customOcrKey;
       }
 
       const res = await fetch("/api/parse-pdf", {

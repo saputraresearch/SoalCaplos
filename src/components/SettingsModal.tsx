@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Key, Save, Check, ExternalLink, X, ShieldCheck, Cpu, Eye, EyeOff, Info } from "lucide-react";
+import { Key, Save, Check, ExternalLink, X, ShieldCheck, Cpu, Eye, EyeOff, Info, FileText } from "lucide-react";
 
 interface SettingsModalProps {
   isOpen: boolean;
@@ -18,8 +18,9 @@ const AVAILABLE_MODELS = [
 export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
   const [primaryKey, setPrimaryKey] = useState("");
   const [backupKey, setBackupKey] = useState("");
+  const [ocrSpaceKey, setOcrSpaceKey] = useState("");
   const [showKeys, setShowKeys] = useState(false);
-  const [model, setModel] = useState("gemini-2.0-flash");
+  const [model, setModel] = useState("gemini-1.5-flash");
   const [saved, setSaved] = useState(false);
 
   useEffect(() => {
@@ -28,8 +29,9 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
       const [k1, ...rest] = storedKey.split(/[\s,\n;]+/).filter(Boolean);
       setPrimaryKey(k1 || "");
       setBackupKey(rest.join(",") || "");
+      setOcrSpaceKey(localStorage.getItem("quizcaplos_ocrspace_key") || "");
 
-      let storedModel = localStorage.getItem("quizcaplos_gemini_model") || "gemini-2.0-flash";
+      let storedModel = localStorage.getItem("quizcaplos_gemini_model") || "gemini-1.5-flash";
       if (
         storedModel.includes("3.6") ||
         storedModel.includes("2.5") ||
@@ -37,12 +39,10 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
         storedModel === "gemini-3.6-flash" ||
         storedModel === "gemini-2.5-flash" ||
         storedModel === "gemini-2.5-pro" ||
-        storedModel === "gemini-2.0-flash-exp" ||
-        storedModel === "gemini-1.5-flash-latest" ||
-        storedModel === "gemini-1.5-pro-latest"
+        storedModel === "gemini-2.0-flash-exp"
       ) {
-        storedModel = "gemini-2.0-flash";
-        localStorage.setItem("quizcaplos_gemini_model", "gemini-2.0-flash");
+        storedModel = "gemini-1.5-flash";
+        localStorage.setItem("quizcaplos_gemini_model", "gemini-1.5-flash");
       }
       setModel(storedModel);
     }
@@ -52,6 +52,7 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
     if (typeof window !== "undefined") {
       const combined = [primaryKey.trim(), backupKey.trim()].filter(Boolean).join(",");
       localStorage.setItem("quizcaplos_gemini_api_key", combined);
+      localStorage.setItem("quizcaplos_ocrspace_key", ocrSpaceKey.trim());
       localStorage.setItem("quizcaplos_gemini_model", model);
       setSaved(true);
       setTimeout(() => {
@@ -155,6 +156,38 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
           <p className="text-xs text-slate-500">
             Sistem otomatis menggunakan mode Hybrid Text untuk menghemat kuota hingga 90%.
           </p>
+        </div>
+
+        {/* OCR.space Free API Key (Khusus PDF Scan / Foto Kamera) */}
+        <div className="space-y-1.5 pt-3 border-t border-slate-100">
+          <div className="flex items-center justify-between">
+            <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
+              <FileText className="w-3.5 h-3.5 text-emerald-600" />
+              <span>OCR.space Key (Khusus PDF Scan / Foto)</span>
+            </label>
+            <span className="text-[10px] text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md font-bold">
+              25k Halaman/Bln Gratis
+            </span>
+          </div>
+          <input
+            type={showKeys ? "text" : "password"}
+            value={ocrSpaceKey}
+            onChange={(e) => setOcrSpaceKey(e.target.value)}
+            placeholder="K8xxxxxxxx88957 (Opsional - default: demo key)"
+            className="w-full px-4 py-2.5 rounded-xl border border-slate-300 text-sm font-mono focus:ring-2 focus:ring-emerald-500 focus:outline-hidden"
+          />
+          <div className="flex items-center justify-between text-[11px] text-slate-500 pt-0.5">
+            <span>Daftar gratis (10 detik tanpa kartu kredit):</span>
+            <a
+              href="https://ocr.space/ocrapi"
+              target="_blank"
+              rel="noreferrer"
+              className="inline-flex items-center gap-1 text-emerald-600 font-bold hover:underline"
+            >
+              <span>Dapatkan Free OCR Key</span>
+              <ExternalLink className="w-3 h-3" />
+            </a>
+          </div>
         </div>
 
         <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-600 space-y-1">

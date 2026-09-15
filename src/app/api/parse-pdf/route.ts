@@ -3,6 +3,7 @@ import { GoogleGenerativeAI } from "@google/generative-ai";
 import { ParsedQuestion } from "@/lib/types";
 import { enrichQuestionsWithImages } from "@/lib/pdfImageExtractor";
 import { extractPdfDigitalText } from "@/lib/pdfTextExtractor";
+import { extractScannedPdfWithOcrSpace } from "@/lib/ocrSpace";
 import { getActiveGeminiModels, normalizeModelName } from "@/lib/geminiModels";
 import { logServerError } from "@/lib/serverLogger";
 import dns from "dns";
@@ -70,8 +71,8 @@ export async function POST(req: NextRequest) {
     const base64Data = pdfBuffer.toString("base64");
 
     const requestedModel = (req.headers.get("x-gemini-model") || (formData.get("model") as string | null))?.trim();
-    // Prioritize 1.5-flash and 2.0-flash so that if a new project has limit: 0 on 2.0-flash, 1.5-flash succeeds
-    const candidateList = [requestedModel, "gemini-1.5-flash", "gemini-2.0-flash", "gemini-1.5-pro"].filter(Boolean) as string[];
+    // Prioritize high-throughput flash models with universal free tier availability
+    const candidateList = [requestedModel, "gemini-1.5-flash", "gemini-2.0-flash", "gemini-1.5-flash-8b", "gemini-1.5-flash-latest"].filter(Boolean) as string[];
     const modelsToTry = Array.from(new Set(candidateList.map((m) => normalizeModelName(m))));
     console.log(`[parse-pdf] Candidate models to try in order:`, modelsToTry, `(Active keys: ${apiKeys.length})`);
 
@@ -155,6 +156,26 @@ PANDUAN DETEKSI GAMBAR (DIAGRAM SOAL & GAMBAR OPSI):
     console.log(
       `[parse-pdf] Hybrid text extraction: hasDigitalText=${digitalTextResult.hasDigitalText}, chars=${digitalTextResult.charCount}, pages=${digitalTextResult.pageCount}`
     );
+
+    // If no digital text detected, try OCR.space to convert scanned pages into text (0 AI tokens)
+    if (!digitalTextResult.hasDigitalText) {
+      const ocrApiKey = (req.headers.get("x-ocrspace-api-key") || (formData.get("ocr_api_key") as string | null))?.trim();
+      try {
+        const ocrResult = await extractScannedPdfWithOcrSpace(pdfBuffer, ocrApiKey);
+        if (ocrResult.success && ocrResult.text) {
+          console.log(`[parse-pdf] OCR.space successfully converted scanned PDF to text (${ocrResult.text.length} chars)`);
+          digitalTextResult = {
+            hasDigitalText: true,
+            fullText: ocrResult.text,
+            charCount: ocrResult.text.length,
+            pageCount: ocrResult.pageCount || 1,
+            pageTexts: [{ pageNumber: 1, text: ocrResult.text }],
+          };
+        }
+      } catch (ocrErr) {
+        console.warn("[parse-pdf] OCR.space attempt error:", ocrErr);
+      }
+    }
 
     // If digital text exists, send PURE TEXT as the primary prompt!
     // This cuts token consumption by 99% (from ~250,000 visual tokens to ~1,500 text tokens)
