@@ -143,46 +143,136 @@ const STEP_COLORS = [
   { bg: "bg-teal-500", text: "text-white", border: "border-teal-300", light: "bg-teal-50", badge: "bg-teal-100 text-teal-800" },
 ];
 
+const QUESTION_TYPE_CONFIG: Record<string, { label: string; icon: string; color: string }> = {
+  MULTIPLE_CHOICE: { label: "Pilihan Ganda", icon: "🔘", color: "bg-blue-50 text-blue-700 border-blue-200" },
+  REORDER: { label: "Urutan Langkah (Tap/Drag)", icon: "🔄", color: "bg-amber-50 text-amber-700 border-amber-200" },
+  MATCHING: { label: "Menjodohkan 1-ke-1", icon: "🧩", color: "bg-purple-50 text-purple-700 border-purple-200" },
+  MULTIPLE_SELECT: { label: "Pilihan Ganda Kompleks", icon: "☑️", color: "bg-indigo-50 text-indigo-700 border-indigo-200" },
+  FILL_IN_THE_BLANKS: { label: "Isian Rumpang", icon: "✏️", color: "bg-emerald-50 text-emerald-700 border-emerald-200" },
+  CATEGORIZE_ITEMS: { label: "Pengelompokan Kategori", icon: "📦", color: "bg-teal-50 text-teal-700 border-teal-200" },
+  TRUE_OR_FALSE: { label: "Benar atau Salah", icon: "⚖️", color: "bg-rose-50 text-rose-700 border-rose-200" },
+  MATH_RESPONSE: { label: "Matematika & Angka", icon: "🔢", color: "bg-cyan-50 text-cyan-700 border-cyan-200" },
+  IMAGE_LABELING: { label: "Labeling Gambar", icon: "📍", color: "bg-sky-50 text-sky-700 border-sky-200" },
+  IMAGE_HOTSPOT: { label: "Hotspot Titik", icon: "🎯", color: "bg-orange-50 text-orange-700 border-orange-200" },
+  OPEN_ENDED: { label: "Uraian / Esai", icon: "📝", color: "bg-slate-50 text-slate-700 border-slate-200" },
+};
+
 const DEMO_QUIZ: Quiz = {
   id: "demo-quiz-id",
-  title: "Demo Quiz: Science & General Knowledge",
+  title: "Demo Showroom: Eksplorasi 8 Tipe Soal Interaktif Caplos",
   slug: "demo",
   created_at: new Date().toISOString(),
+  status: "published",
 };
 
 const DEMO_QUESTIONS: Question[] = [
   {
-    id: "q1",
+    id: "demo-q1",
     quiz_id: "demo-quiz-id",
-    question_text: "What is the primary source of energy for Earth's climate system?",
+    question_text: "Planet manakah dalam tata surya kita yang memiliki julukan terkenal sebagai 'Planet Merah'?",
     question_type: "MULTIPLE_CHOICE",
     image_url: null,
-    options: ["The Sun", "Geothermal vents", "The Moon's gravity", "Nuclear decay"],
-    correct_answer_index: 0,
-    explanation: "The Sun provides the solar radiation that drives atmospheric circulation and climate on Earth.",
+    options: ["Merkurius", "Mars", "Jupiter", "Venus"],
+    correct_answer_index: 1,
+    explanation: "Mars tampak kemerahan di langit malam karena permukaannya kaya akan kandungan senyawa besi oksida (karat).",
     order_index: 0,
   },
   {
-    id: "q2",
+    id: "demo-q2",
     quiz_id: "demo-quiz-id",
-    question_text: "Which planet is known as the Red Planet?",
-    question_type: "MULTIPLE_CHOICE",
+    question_text: "Susunlah tahapan metamorfosis sempurna pada kupu-kupu dari fase paling awal hingga menjadi kupu-kupu dewasa!",
+    question_type: "REORDER",
     image_url: null,
-    options: ["Venus", "Mars", "Jupiter", "Saturn"],
-    correct_answer_index: 1,
-    explanation: "Mars appears reddish due to the prevalence of iron oxide (rust) on its surface.",
+    options: ["Telur", "Ulat (Larva)", "Kepompong (Pupa)", "Kupu-kupu Dewasa"],
+    correct_answer_index: 0,
+    reorder_items: ["Telur", "Ulat (Larva)", "Kepompong (Pupa)", "Kupu-kupu Dewasa"],
+    correct_order: [0, 1, 2, 3],
+    explanation: "Daur hidup kupu-kupu dimulai dari Telur yang menetas menjadi Ulat (larva), kemudian beristirahat dalam Kepompong (pupa), dan akhirnya keluar sebagai Kupu-kupu Dewasa.",
     order_index: 1,
   },
   {
-    id: "q3",
+    id: "demo-q3",
     quiz_id: "demo-quiz-id",
-    question_text: "Tumbuhan menghasilkan oksigen melalui proses fotosintesis.",
+    question_text: "Pasangkan setiap organ tubuh manusia berikut dengan fungsi utamanya yang paling tepat!",
+    question_type: "MATCHING",
+    image_url: null,
+    options: [],
+    correct_answer_index: 0,
+    matching_pairs: [
+      { left: "Jantung", right: "Memompa darah ke seluruh tubuh" },
+      { left: "Paru-paru", right: "Pertukaran oksigen dan karbon dioksida" },
+      { left: "Lambung", right: "Mencerna makanan secara kimiawi & mekanik" },
+      { left: "Otak", right: "Pusat pengendali seluruh aktivitas tubuh" },
+    ],
+    explanation: "Setiap organ memiliki peran vital: Jantung memompa darah, Paru-paru untuk pernapasan, Lambung mencerna makanan, dan Otak mengendalikan koordinasi tubuh.",
+    order_index: 2,
+  },
+  {
+    id: "demo-q4",
+    quiz_id: "demo-quiz-id",
+    question_text: "Pilihlah SEMUA hewan di bawah ini yang tergolong sebagai pemakan tumbuhan (Herbivora)! (Bisa memilih lebih dari satu jawaban)",
+    question_type: "MULTIPLE_SELECT",
+    image_url: null,
+    options: ["Kelinci", "Harimau", "Sapi", "Singa", "Gajah"],
+    correct_answer_index: 0,
+    correct_answers: [0, 2, 4],
+    explanation: "Kelinci, Sapi, dan Gajah adalah hewan herbivora karena makanan utamanya adalah rumput, daun, atau buah-buahan. Harimau dan Singa adalah karnivora pemakan daging.",
+    order_index: 3,
+  },
+  {
+    id: "demo-q5",
+    quiz_id: "demo-quiz-id",
+    question_text: "Tumbuhan hijau memasak makanannya sendiri melalui proses [___] dengan bantuan sinar matahari dan melepaskan gas [___] yang kita hirup sehari-hari.",
+    question_type: "FILL_IN_THE_BLANKS",
+    image_url: null,
+    options: [],
+    correct_answer_index: 0,
+    blanks_keywords: ["fotosintesis", "oksigen, o2"],
+    explanation: "Melalui proses fotosintesis, klorofil pada daun menyerap cahaya matahari untuk mengubah air dan karbon dioksida menjadi energi serta gas oksigen.",
+    order_index: 4,
+  },
+  {
+    id: "demo-q6",
+    quiz_id: "demo-quiz-id",
+    question_text: "Kelompokkan benda-benda berikut ke dalam wujud zat yang sesuai (Padat, Cair, atau Gas)!",
+    question_type: "CATEGORIZE_ITEMS",
+    image_url: null,
+    options: [],
+    correct_answer_index: 0,
+    categories: ["Benda Padat", "Benda Cair", "Benda Gas"],
+    categorize_items: [
+      { text: "Batu Kerikil", category: "Benda Padat" },
+      { text: "Meja Kayu", category: "Benda Padat" },
+      { text: "Minyak Goreng", category: "Benda Cair" },
+      { text: "Susu Segar", category: "Benda Cair" },
+      { text: "Udara di Balon", category: "Benda Gas" },
+      { text: "Uap Air Panas", category: "Benda Gas" },
+    ],
+    explanation: "Benda padat memiliki bentuk dan volume tetap. Benda cair bentuknya mengikuti wadah. Benda gas mengisi seluruh ruangan yang ditempatinya.",
+    order_index: 5,
+  },
+  {
+    id: "demo-q7",
+    quiz_id: "demo-quiz-id",
+    question_text: "Bulan memancarkan cahayanya sendiri pada malam hari sama seperti matahari.",
     question_type: "TRUE_OR_FALSE",
     image_url: null,
     options: ["Benar", "Salah"],
+    correct_answer_index: 1,
+    explanation: "Salah! Bulan tidak menghasilkan cahaya sendiri. Cahaya bulan yang kita lihat di malam hari adalah pantulan sinar matahari pada permukaan bulan.",
+    order_index: 6,
+  },
+  {
+    id: "demo-q8",
+    quiz_id: "demo-quiz-id",
+    question_text: "Ibu membeli 4 kotak donat untuk acara keluarga. Jika setiap kotak berisi 6 buah donat lezat, berapakah jumlah seluruh donat yang dibeli Ibu?",
+    question_type: "MATH_RESPONSE",
+    image_url: null,
+    options: ["24"],
     correct_answer_index: 0,
-    explanation: "Fotosintesis mengubah karbondioksida dan air menjadi glukosa dan oksigen dengan bantuan cahaya matahari.",
-    order_index: 2,
+    math_solution: "4 kotak × 6 donat = 24 donat",
+    explanation: "Untuk mencari jumlah total donat: 4 kotak × 6 donat per kotak = 24 donat.",
+    order_index: 7,
   },
 ];
 
@@ -1146,6 +1236,46 @@ export default function StudentQuizPage() {
           </div>
         )}
 
+        {isDemo && (
+          <div className="bg-gradient-to-br from-blue-50/80 via-amber-50/40 to-sky-50 border-2 border-caplos-blue/30 rounded-2xl p-4 text-left space-y-3 shadow-xs">
+            <div className="flex items-start gap-2.5">
+              <span className="text-2xl shrink-0">✨</span>
+              <div>
+                <h3 className="text-sm font-black text-caplos-navy">Mode Eksplorasi Demo Interaktif</h3>
+                <p className="text-xs text-caplos-navy-600 font-medium leading-relaxed">
+                  Rasakan langsung 8 variasi tipe soal interaktif Caplos yang seru, dinamis, dan dirancang khusus agar siswa antusias belajar:
+                </p>
+              </div>
+            </div>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5 pt-1">
+              <div className="px-2.5 py-1.5 rounded-xl text-[11px] font-bold bg-white text-blue-800 border border-blue-200/80 shadow-2xs flex items-center gap-1.5">
+                <span>🔘</span> Pilihan Ganda
+              </div>
+              <div className="px-2.5 py-1.5 rounded-xl text-[11px] font-bold bg-white text-amber-800 border border-amber-200/80 shadow-2xs flex items-center gap-1.5">
+                <span>🔄</span> Urutan Langkah
+              </div>
+              <div className="px-2.5 py-1.5 rounded-xl text-[11px] font-bold bg-white text-purple-800 border border-purple-200/80 shadow-2xs flex items-center gap-1.5">
+                <span>🧩</span> Menjodohkan
+              </div>
+              <div className="px-2.5 py-1.5 rounded-xl text-[11px] font-bold bg-white text-indigo-800 border border-indigo-200/80 shadow-2xs flex items-center gap-1.5">
+                <span>☑️</span> PG Kompleks
+              </div>
+              <div className="px-2.5 py-1.5 rounded-xl text-[11px] font-bold bg-white text-emerald-800 border border-emerald-200/80 shadow-2xs flex items-center gap-1.5">
+                <span>✏️</span> Isian Rumpang
+              </div>
+              <div className="px-2.5 py-1.5 rounded-xl text-[11px] font-bold bg-white text-teal-800 border border-teal-200/80 shadow-2xs flex items-center gap-1.5">
+                <span>📦</span> Pengelompokan
+              </div>
+              <div className="px-2.5 py-1.5 rounded-xl text-[11px] font-bold bg-white text-rose-800 border border-rose-200/80 shadow-2xs flex items-center gap-1.5">
+                <span>⚖️</span> Benar / Salah
+              </div>
+              <div className="px-2.5 py-1.5 rounded-xl text-[11px] font-bold bg-white text-cyan-800 border border-cyan-200/80 shadow-2xs flex items-center gap-1.5">
+                <span>🔢</span> Matematika
+              </div>
+            </div>
+          </div>
+        )}
+
         <form
           onSubmit={(e) => {
             e.preventDefault();
@@ -1312,8 +1442,13 @@ export default function StudentQuizPage() {
       {/* Question Card */}
       <div className="bg-white p-6 md:p-8 rounded-3xl border border-slate-200 shadow-md space-y-6 animate-pop">
         <div className="flex items-center justify-between">
-          <span className="px-3 py-1 bg-indigo-50 border border-indigo-100 text-indigo-700 text-xs font-bold rounded-full uppercase tracking-wider">
-            {currentType.replace(/_/g, " ")}
+          <span
+            className={`inline-flex items-center gap-1.5 px-3 py-1 text-xs font-bold rounded-full border shadow-2xs ${
+              QUESTION_TYPE_CONFIG[currentType]?.color || "bg-indigo-50 border-indigo-100 text-indigo-700"
+            }`}
+          >
+            <span>{QUESTION_TYPE_CONFIG[currentType]?.icon || "📝"}</span>
+            <span>{QUESTION_TYPE_CONFIG[currentType]?.label || currentType.replace(/_/g, " ")}</span>
           </span>
           {isAnswered && (
             <span
