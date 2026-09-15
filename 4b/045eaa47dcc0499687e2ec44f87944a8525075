@@ -1,0 +1,14 @@
+src/app/page.tsx
+  h_7310902349a227 12-14,18-21,23-31,35-36
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "4b045eaa47dcc0499687e2ec44f87944a8525075",
+  "prompts": {},
+  "humans": {
+    "h_7310902349a227": {
+      "author": "saputra.a.pratama <saputra.a.pratama@gdn-commerce.com>"
+    }
+  }
+}
