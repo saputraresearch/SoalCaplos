@@ -18,6 +18,12 @@ export async function POST(req: NextRequest) {
   let digitalTextResult: any = null;
   let apiKeys: string[] = [];
   const triedLog: string[] = [];
+  const extractionSteps: Array<{
+    id: string;
+    label: string;
+    status: "success" | "failed" | "skipped";
+    detail: string;
+  }> = [];
 
   try {
     const formData = await req.formData();
@@ -154,30 +160,77 @@ PANDUAN DETEKSI GAMBAR (DIAGRAM SOAL & GAMBAR OPSI):
    - Berikan "image_box": [ymin, xmin, ymax, xmax] (skala 0-1000).
    - Berikan "image_description": deskripsi gambar opsi tersebut.`;
 
-    // Hybrid PDF Extraction (Ide 2): Extract digital text locally in ~50ms
+    // Hybrid PDF Extraction: Extract digital text locally in ~50ms
+    // extractionSteps tracks every pipeline step for the UI progress panel
+
     digitalTextResult = await extractPdfDigitalText(pdfBuffer);
     console.log(
       `[parse-pdf] Hybrid text extraction: hasDigitalText=${digitalTextResult.hasDigitalText}, chars=${digitalTextResult.charCount}, pages=${digitalTextResult.pageCount}`
     );
 
+    extractionSteps.push({
+      id: "local_text",
+      label: "Ekstraksi Teks Lokal",
+      status: digitalTextResult.hasDigitalText ? "success" : "failed",
+      detail: digitalTextResult.hasDigitalText
+        ? `${digitalTextResult.charCount} karakter dari ${digitalTextResult.pageCount} halaman`
+        : "PDF scan/foto — tidak ada teks digital",
+    });
+
     // If no digital text detected, try OCR.space to convert scanned pages into text (0 AI tokens)
     if (!digitalTextResult.hasDigitalText) {
       const ocrApiKey = (req.headers.get("x-ocrspace-api-key") || (formData.get("ocr_api_key") as string | null))?.trim();
-      try {
-        const ocrResult = await extractScannedPdfWithOcrSpace(pdfBuffer, ocrApiKey);
-        if (ocrResult.success && ocrResult.text) {
-          console.log(`[parse-pdf] OCR.space successfully converted scanned PDF to text (${ocrResult.text.length} chars)`);
-          digitalTextResult = {
-            hasDigitalText: true,
-            fullText: ocrResult.text,
-            charCount: ocrResult.text.length,
-            pageCount: ocrResult.pageCount || 1,
-            pageTexts: [{ pageNumber: 1, text: ocrResult.text }],
-          };
+      if (!ocrApiKey) {
+        extractionSteps.push({
+          id: "ocr_space",
+          label: "OCR Space",
+          status: "skipped",
+          detail: "API Key OCR Space tidak ditemukan di Pengaturan",
+        });
+      } else {
+        try {
+          const ocrResult = await extractScannedPdfWithOcrSpace(pdfBuffer, ocrApiKey);
+          if (ocrResult.success && ocrResult.text) {
+            console.log(`[parse-pdf] OCR.space converted scanned PDF to text (${ocrResult.text.length} chars)`);
+            digitalTextResult = {
+              hasDigitalText: true,
+              fullText: ocrResult.text,
+              charCount: ocrResult.text.length,
+              pageCount: ocrResult.pageCount || 1,
+              pageTexts: [{ pageNumber: 1, text: ocrResult.text }],
+            };
+            extractionSteps.push({
+              id: "ocr_space",
+              label: "OCR Space",
+              status: "success",
+              detail: `${ocrResult.text.length} karakter berhasil diekstrak dari scan PDF`,
+            });
+          } else {
+            extractionSteps.push({
+              id: "ocr_space",
+              label: "OCR Space",
+              status: "failed",
+              detail: ocrResult.error || "OCR Space tidak mengembalikan teks",
+            });
+          }
+        } catch (ocrErr) {
+          const ocrErrMsg = ocrErr instanceof Error ? ocrErr.message : String(ocrErr);
+          console.warn("[parse-pdf] OCR.space attempt error:", ocrErrMsg);
+          extractionSteps.push({
+            id: "ocr_space",
+            label: "OCR Space",
+            status: "failed",
+            detail: ocrErrMsg.slice(0, 120),
+          });
         }
-      } catch (ocrErr) {
-        console.warn("[parse-pdf] OCR.space attempt error:", ocrErr);
       }
+    } else {
+      extractionSteps.push({
+        id: "ocr_space",
+        label: "OCR Space",
+        status: "skipped",
+        detail: "Tidak diperlukan — teks digital sudah tersedia",
+      });
     }
 
     // If digital text exists, send PURE TEXT as the primary prompt!
@@ -226,17 +279,37 @@ PANDUAN DETEKSI GAMBAR (DIAGRAM SOAL & GAMBAR OPSI):
         if (groqRes.success && groqRes.data) {
           responseText = JSON.stringify(groqRes.data);
           successfulModel = `groq/${groqRes.model || "llama-4-scout"}`;
+          extractionSteps.push({
+            id: "groq",
+            label: "Groq AI",
+            status: "success",
+            detail: `Berhasil dengan model: ${groqRes.model}${groqRes.triedModels && groqRes.triedModels.length > 1 ? ` (dicoba ${groqRes.triedModels.length} model)` : ""}`,
+          });
           console.log(`[parse-pdf] Groq parsing succeeded with model: ${groqRes.model}`);
           return true;
         } else {
           const errMsg = groqRes.error || "Groq parsing failed.";
           triedLog.push(`Groq: ${errMsg.slice(0, 120)}`);
+          extractionSteps.push({
+            id: "groq",
+            label: "Groq AI",
+            status: "failed",
+            detail: groqRes.triedModels
+              ? `${groqRes.triedModels.length} model dicoba, semua gagal. ${errMsg.slice(0, 100)}`
+              : errMsg.slice(0, 150),
+          });
           console.warn("[parse-pdf] Groq parsing failed:", errMsg);
           lastError = new Error(errMsg);
         }
       } else {
         console.warn("[parse-pdf] Groq requires digital text, but PDF has no text layer.");
         triedLog.push("Groq: Memerlukan teks digital / OCR");
+        extractionSteps.push({
+          id: "groq",
+          label: "Groq AI",
+          status: "skipped",
+          detail: "Tidak ada teks yang bisa dikirim ke Groq (PDF scan tanpa OCR)",
+        });
       }
       return false;
     };
@@ -284,6 +357,12 @@ PANDUAN DETEKSI GAMBAR (DIAGRAM SOAL & GAMBAR OPSI):
             if (responseText) {
               successfulModel = modelName;
               successfulKeyIndex = keyIdx;
+              extractionSteps.push({
+                id: `gemini_key${keyIdx + 1}`,
+                label: `Gemini (Key #${keyIdx + 1})`,
+                status: "success",
+                detail: `Berhasil dengan model: ${modelName}`,
+              });
               console.log(`Extraction succeeded with key #${keyIdx + 1} and model: ${modelName}`);
               break keyLoop;
             }
@@ -301,10 +380,26 @@ PANDUAN DETEKSI GAMBAR (DIAGRAM SOAL & GAMBAR OPSI):
           }
         }
       }
+      // If Gemini loop finished without success, log step
+      if (!responseText && !extractionSteps.find((s) => s.id.startsWith("gemini"))) {
+        extractionSteps.push({
+          id: "gemini",
+          label: "Gemini AI",
+          status: "failed",
+          detail: triedLog.filter((t) => t.includes("Key #")).slice(-1)[0]?.slice(0, 150) || "Semua Gemini key/model gagal",
+        });
+      }
+    } else if (!responseText && apiKeys.length === 0) {
+      extractionSteps.push({
+        id: "gemini",
+        label: "Gemini AI",
+        status: "skipped",
+        detail: "Tidak ada Gemini API Key yang dikonfigurasi",
+      });
     }
 
     // If Gemini models failed, try Groq Cloud AI as fallback!
-    if (!responseText && groqApiKey) {
+    if (!responseText && groqApiKey && !extractionSteps.find((s) => s.id === "groq" && s.status === "success")) {
       console.log(`[parse-pdf] Gemini models failed, running Groq Cloud AI fallback...`);
       await tryGroq();
     }
@@ -315,6 +410,7 @@ PANDUAN DETEKSI GAMBAR (DIAGRAM SOAL & GAMBAR OPSI):
         new Error(
           "Could not generate quiz content with available Gemini models. Please check your API key permissions."
         )
+
       );
     }
 
@@ -368,6 +464,7 @@ PANDUAN DETEKSI GAMBAR (DIAGRAM SOAL & GAMBAR OPSI):
       title: detectedTitle,
       modelUsed: successfulModel,
       questions: enrichedQuestions,
+      extractionSteps,
     });
   } catch (error: unknown) {
     const rawError = error instanceof Error ? error.message : String(error);
@@ -389,6 +486,7 @@ PANDUAN DETEKSI GAMBAR (DIAGRAM SOAL & GAMBAR OPSI):
       {
         error: userFriendlyError,
         rawDetails: rawError,
+        extractionSteps,
         diagnostics: {
           hasDigitalText: digitalTextResult?.hasDigitalText ?? false,
           charCount: digitalTextResult?.charCount ?? 0,

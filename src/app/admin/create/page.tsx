@@ -31,6 +31,8 @@ import AddQuestionMenu from "@/components/AddQuestionMenu";
 import { createDefaultQuestion } from "@/lib/questionTemplates";
 import { reportClientError } from "@/components/ErrorTelemetry";
 import { safeParseResponseJson } from "@/lib/apiResponse";
+import ExtractionFlowPanel, { type ExtractionStep } from "@/components/ExtractionFlowPanel";
+
 
 export default function CreateQuizPage() {
   const router = useRouter();
@@ -47,6 +49,8 @@ export default function CreateQuizPage() {
     keysTested: number;
     triedLog: string[];
   } | null>(null);
+  const [extractionSteps, setExtractionSteps] = useState<ExtractionStep[]>([]);
+
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
 
   // Parsed Quiz Data
@@ -175,6 +179,7 @@ export default function CreateQuizPage() {
     setIsParsing(true);
     setParseError(null);
     setParseDiagnostics(null);
+    setExtractionSteps([]);
 
     const customApiKey = typeof window !== "undefined" ? localStorage.getItem("quizcaplos_gemini_api_key") || "" : "";
     let customModel = typeof window !== "undefined" ? localStorage.getItem("quizcaplos_gemini_model") || "gemini-2.0-flash" : "gemini-2.0-flash";
@@ -247,6 +252,9 @@ export default function CreateQuizPage() {
         if (parsedResult.data?.diagnostics) {
           setParseDiagnostics(parsedResult.data.diagnostics);
         }
+        if (parsedResult.data?.extractionSteps) {
+          setExtractionSteps(parsedResult.data.extractionSteps);
+        }
         const errorText = parsedResult.error || "Gagal memproses dokumen PDF.";
         if (
           errorText.includes("API Key is missing") ||
@@ -259,6 +267,11 @@ export default function CreateQuizPage() {
       }
 
       const data = parsedResult.data;
+
+      // Populate extraction steps from successful response
+      if (data.extractionSteps) {
+        setExtractionSteps(data.extractionSteps);
+      }
 
       setQuizTitle(data.title || file.name.replace(/\.[^/.]+$/, ""));
       const extractedQuestions = data.questions || [];
@@ -731,35 +744,8 @@ export default function CreateQuizPage() {
                 </div>
               </div>
 
-              {parseDiagnostics && (
-                <div className="p-3 bg-white/90 border border-red-200/90 rounded-xl text-xs space-y-1.5 text-slate-700 shadow-xs">
-                  <div className="font-bold text-slate-800 flex items-center gap-1.5">
-                    <span>🔍 Hasil Diagnostik Ekstraksi:</span>
-                  </div>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 text-[11px]">
-                    <div className="flex items-center gap-1">
-                      <span className="text-slate-500">• Status Dokumen:</span>
-                      <span className="font-bold text-slate-800">
-                        {parseDiagnostics.hasDigitalText
-                          ? `Teks Digital Terdeteksi (${parseDiagnostics.charCount} karakter, ${parseDiagnostics.pageCount} halaman)`
-                          : "Dokumen Scan/Foto (Tidak ada teks digital)"}
-                      </span>
-                    </div>
-                    <div className="flex items-center gap-1">
-                      <span className="text-slate-500">• API Key Diuji:</span>
-                      <span className="font-bold text-slate-800">{parseDiagnostics.keysTested} key aktif</span>
-                    </div>
-                  </div>
-                  {parseDiagnostics.triedLog && parseDiagnostics.triedLog.length > 0 && (
-                    <div className="text-[10px] font-mono text-slate-600 bg-slate-50 p-2 rounded-lg border border-slate-200/80 max-h-24 overflow-y-auto space-y-0.5 mt-1">
-                      <div className="font-bold text-slate-700">Riwayat Model yang Dicoba:</div>
-                      {parseDiagnostics.triedLog.map((log: string, idx: number) => (
-                        <div key={idx} className="truncate">• {log}</div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              )}
+              {/* Extraction Flow Panel — shows every step with status */}
+              <ExtractionFlowPanel steps={extractionSteps} />
 
               <div className="flex flex-wrap items-center gap-2 pt-1 border-t border-red-200/60">
                 <button
@@ -803,6 +789,15 @@ export default function CreateQuizPage() {
                 </button>
               </div>
             </div>
+          )}
+
+          {/* Show extraction flow panel while loading */}
+          {isParsing && extractionSteps.length === 0 && (
+            <ExtractionFlowPanel steps={[]} isLoading={true} />
+          )}
+          {/* Show completed steps after success (no error) */}
+          {!parseError && !isParsing && extractionSteps.length > 0 && (
+            <ExtractionFlowPanel steps={extractionSteps} />
           )}
 
           {file && (

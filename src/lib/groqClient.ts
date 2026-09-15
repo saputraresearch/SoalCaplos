@@ -1,19 +1,29 @@
 /**
  * Groq Cloud AI Client
  * Provides ultra-fast inference (<1s) and high rate limits on free tier.
- * Uses Llama 4 Scout (free tier, vision-capable) as primary model.
- * Falls back to llama-3.1-8b-instant if primary is unavailable.
+ *
+ * Model fallback chain (tried in order until one succeeds):
+ * 1. meta-llama/llama-4-scout-17b-16e-instruct  – Llama 4 Scout, free, vision-capable
+ * 2. llama-3.3-70b-versatile                     – Llama 3.3 70B, free dev plan
+ * 3. llama-3.1-8b-instant                        – Llama 3.1 8B, free dev plan, fastest
+ * 4. llama3-70b-8192                             – Legacy stable ID for 70B
+ * 5. llama3-8b-8192                              – Legacy stable ID for 8B
+ * 6. gemma2-9b-it                               – Google Gemma 2 on Groq
  */
 
-// Free-tier models — ordered by capability (best first)
 const GROQ_TEXT_MODELS = [
-  "meta-llama/llama-4-scout-17b-16e-instruct", // Free, 128K ctx, vision-capable
-  "llama-3.1-8b-instant",                       // Free, 128K ctx, very fast
+  "meta-llama/llama-4-scout-17b-16e-instruct",
+  "llama-3.3-70b-versatile",
+  "llama-3.1-8b-instant",
+  "llama3-70b-8192",
+  "llama3-8b-8192",
+  "gemma2-9b-it",
 ];
 
 const GROQ_VISION_MODELS = [
-  "meta-llama/llama-4-scout-17b-16e-instruct", // Free, multimodal (image + text)
-  "llama-3.2-11b-vision-preview",               // Preview, may be unavailable
+  "meta-llama/llama-4-scout-17b-16e-instruct",
+  "llama-3.2-11b-vision-preview",
+  "llama-3.2-90b-vision-preview",
 ];
 
 async function groqChatCompletion(
@@ -44,7 +54,7 @@ export async function parseQuizWithGroqText(
   fullText: string,
   systemPrompt: string,
   apiKey: string
-): Promise<{ success: boolean; data?: any; error?: string; model?: string }> {
+): Promise<{ success: boolean; data?: any; error?: string; model?: string; triedModels?: string[] }> {
   const messages = [
     { role: "system", content: systemPrompt },
     {
@@ -53,42 +63,56 @@ export async function parseQuizWithGroqText(
     },
   ];
 
+  const triedModels: string[] = [];
   let lastError = "";
+
   for (const model of GROQ_TEXT_MODELS) {
+    triedModels.push(model);
     try {
       const { ok, status, body } = await groqChatCompletion(model, messages, apiKey);
 
       if (!ok) {
         const errText = JSON.stringify(body);
-        // If model not found, try next model
+        // 404/400 = model not found or no access → try next model
         if (status === 404 || status === 400) {
-          lastError = `Groq model '${model}' not found (HTTP ${status}): ${errText}`;
+          lastError = `Model '${model}' tidak tersedia (HTTP ${status})`;
+          console.warn(`[groqClient] ${lastError}`);
           continue;
         }
-        return { success: false, error: `Groq API returned HTTP ${status}: ${errText}` };
+        // 429 = rate limit → stop trying (no point trying other models with same key)
+        return {
+          success: false,
+          error: `Groq rate limited (429). Coba lagi dalam 1 menit.`,
+          triedModels,
+        };
       }
 
       const content = body.choices?.[0]?.message?.content;
       if (!content) {
-        lastError = `Groq model '${model}' returned empty response.`;
+        lastError = `Model '${model}' mengembalikan respons kosong.`;
         continue;
       }
 
       const parsed = JSON.parse(content);
-      return { success: true, data: parsed, model };
+      return { success: true, data: parsed, model, triedModels };
     } catch (err: unknown) {
       lastError = err instanceof Error ? err.message : String(err);
+      console.warn(`[groqClient] Model ${model} error:`, lastError);
     }
   }
 
-  return { success: false, error: lastError || "All Groq text models failed." };
+  return {
+    success: false,
+    error: `Semua model Groq gagal. Model dicoba: ${triedModels.join(", ")}. Error terakhir: ${lastError}`,
+    triedModels,
+  };
 }
 
 export async function parseQuizWithGroqVision(
   jpegBase64Images: string[],
   systemPrompt: string,
   apiKey: string
-): Promise<{ success: boolean; data?: any; error?: string; model?: string }> {
+): Promise<{ success: boolean; data?: any; error?: string; model?: string; triedModels?: string[] }> {
   const contentParts: any[] = [
     {
       type: "text",
@@ -110,34 +134,41 @@ export async function parseQuizWithGroqVision(
     { role: "user", content: contentParts },
   ];
 
+  const triedModels: string[] = [];
   let lastError = "";
+
   for (const model of GROQ_VISION_MODELS) {
+    triedModels.push(model);
     try {
       const { ok, status, body } = await groqChatCompletion(model, messages, apiKey, 60000);
 
       if (!ok) {
         const errText = JSON.stringify(body);
         if (status === 404 || status === 400) {
-          lastError = `Groq vision model '${model}' not found (HTTP ${status}): ${errText}`;
+          lastError = `Vision model '${model}' tidak tersedia (HTTP ${status})`;
           continue;
         }
-        return { success: false, error: `Groq Vision returned HTTP ${status}: ${errText}` };
+        return { success: false, error: `Groq Vision HTTP ${status}: ${errText}`, triedModels };
       }
 
       const content = body.choices?.[0]?.message?.content;
       if (!content) {
-        lastError = `Groq vision model '${model}' returned empty response.`;
+        lastError = `Vision model '${model}' mengembalikan respons kosong.`;
         continue;
       }
 
       const parsed = JSON.parse(content);
-      return { success: true, data: parsed, model };
+      return { success: true, data: parsed, model, triedModels };
     } catch (err: unknown) {
       lastError = err instanceof Error ? err.message : String(err);
     }
   }
 
-  return { success: false, error: lastError || "All Groq vision models failed." };
+  return {
+    success: false,
+    error: `Semua Groq vision model gagal. Error: ${lastError}`,
+    triedModels,
+  };
 }
 
 export async function generateQuizWithGroq(
@@ -156,17 +187,16 @@ export async function generateQuizWithGroq(
       const { ok, status, body } = await groqChatCompletion(model, messages, apiKey);
 
       if (!ok) {
-        const errText = JSON.stringify(body);
         if (status === 404 || status === 400) {
-          lastError = `Groq model '${model}' not found (HTTP ${status}): ${errText}`;
+          lastError = `Model '${model}' tidak tersedia (HTTP ${status})`;
           continue;
         }
-        return { success: false, error: `Groq API returned HTTP ${status}: ${errText}` };
+        return { success: false, error: `Groq API HTTP ${status}: ${JSON.stringify(body)}` };
       }
 
       const content = body.choices?.[0]?.message?.content;
       if (!content) {
-        lastError = `Groq model '${model}' returned empty response.`;
+        lastError = `Model '${model}' mengembalikan respons kosong.`;
         continue;
       }
 
@@ -177,5 +207,5 @@ export async function generateQuizWithGroq(
     }
   }
 
-  return { success: false, error: lastError || "All Groq models failed." };
+  return { success: false, error: `Semua Groq model gagal. Error: ${lastError}` };
 }
