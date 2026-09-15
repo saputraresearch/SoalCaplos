@@ -1,0 +1,19 @@
+src/lib/groqClient.ts
+  s_ee6ebcaf9060b9::t_1d0ed7b09efa09 4-11,15-20,24-26,57,66,68,70,76,78-79,82-87,92,97,100,104-108,115,137,139,141,148,151,156,161,167-171,191,194,199,210
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "00163bc9a9fafed1edec7c140466d75df837753f",
+  "prompts": {},
+  "sessions": {
+    "s_ee6ebcaf9060b9": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "fe3db708-c94c-45c4-bfe5-95e64caebf8d",
+        "model": "claude-sonnet-5"
+      },
+      "human_author": "saputra.a.pratama <saputra.a.pratama@gdn-commerce.com>"
+    }
+  }
+}
