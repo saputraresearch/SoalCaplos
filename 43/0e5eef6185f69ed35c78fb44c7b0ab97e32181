@@ -1,0 +1,16 @@
+src/app/admin/create/page.tsx
+  h_7310902349a227 43-49,177,225-227,712-741
+src/app/api/parse-pdf/route.ts
+  h_7310902349a227 6,16-19,40,73-76,154,194,214,221,237-238,242,244,326-339
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "430e5eef6185f69ed35c78fb44c7b0ab97e32181",
+  "prompts": {},
+  "humans": {
+    "h_7310902349a227": {
+      "author": "saputra.a.pratama <saputra.a.pratama@gdn-commerce.com>"
+    }
+  }
+}
