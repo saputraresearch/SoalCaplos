@@ -3,7 +3,7 @@ import { GoogleGenerativeAI } from "@google/generative-ai";
 import { ParsedQuestion } from "@/lib/types";
 import { enrichQuestionsWithImages } from "@/lib/pdfImageExtractor";
 import { extractPdfDigitalText } from "@/lib/pdfTextExtractor";
-import { getActiveGeminiModels } from "@/lib/geminiModels";
+import { getActiveGeminiModels, normalizeModelName } from "@/lib/geminiModels";
 import { logServerError } from "@/lib/serverLogger";
 import dns from "dns";
 
@@ -13,6 +13,10 @@ dns.setDefaultResultOrder("ipv4first");
 export const maxDuration = 60; // Up to 60s processing window on serverless
 
 export async function POST(req: NextRequest) {
+  let digitalTextResult: any = null;
+  let apiKeys: string[] = [];
+  const triedLog: string[] = [];
+
   try {
     const formData = await req.formData();
 
@@ -33,7 +37,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const apiKeys = rawApiKey
+    apiKeys = rawApiKey
       .split(/[\s,\n;]+/)
       .map((k) => k.trim())
       .filter((k) => k.length > 10);
@@ -66,10 +70,10 @@ export async function POST(req: NextRequest) {
     const base64Data = pdfBuffer.toString("base64");
 
     const requestedModel = (req.headers.get("x-gemini-model") || (formData.get("model") as string | null))?.trim();
-    const allModels = await getActiveGeminiModels(apiKeys[0], requestedModel);
-    // Limit to top 2 candidate models to stay well within serverless execution budget
-    const modelsToTry = allModels.slice(0, 2);
-    console.log(`[parse-pdf] Selected models to try:`, modelsToTry, `(Active keys: ${apiKeys.length})`);
+    // Prioritize 1.5-flash and 2.0-flash so that if a new project has limit: 0 on 2.0-flash, 1.5-flash succeeds
+    const candidateList = [requestedModel, "gemini-1.5-flash", "gemini-2.0-flash", "gemini-1.5-pro"].filter(Boolean) as string[];
+    const modelsToTry = Array.from(new Set(candidateList.map((m) => normalizeModelName(m))));
+    console.log(`[parse-pdf] Candidate models to try in order:`, modelsToTry, `(Active keys: ${apiKeys.length})`);
 
     const systemPrompt = `Act strictly as an expert document transcriber, question type detector, and diagram analyzer. Extract the existing questions, options, and diagram/image information from the uploaded PDF document exactly as written. Return structured JSON matching the quiz schema. Do not generate or invent new questions.
 
@@ -147,7 +151,7 @@ PANDUAN DETEKSI GAMBAR (DIAGRAM SOAL & GAMBAR OPSI):
    - Berikan "image_description": deskripsi gambar opsi tersebut.`;
 
     // Hybrid PDF Extraction (Ide 2): Extract digital text locally in ~50ms
-    const digitalTextResult = await extractPdfDigitalText(pdfBuffer);
+    digitalTextResult = await extractPdfDigitalText(pdfBuffer);
     console.log(
       `[parse-pdf] Hybrid text extraction: hasDigitalText=${digitalTextResult.hasDigitalText}, chars=${digitalTextResult.charCount}, pages=${digitalTextResult.pageCount}`
     );
@@ -187,6 +191,7 @@ PANDUAN DETEKSI GAMBAR (DIAGRAM SOAL & GAMBAR OPSI):
     let lastError: Error | null = null;
     let successfulModel = "";
     let successfulKeyIndex = 0;
+    const triedLog: string[] = [];
 
     keyLoop: for (let keyIdx = 0; keyIdx < apiKeys.length; keyIdx++) {
       const currentApiKey = apiKeys[keyIdx];
@@ -206,14 +211,14 @@ PANDUAN DETEKSI GAMBAR (DIAGRAM SOAL & GAMBAR OPSI):
             result = await model.generateContent(primaryPromptParts);
           } catch (primaryErr: any) {
             const primaryErrMsg = String(primaryErr?.message || primaryErr);
-            // If primary pure-text failed for non-quota reasons and visual fallback is available, try fallback
+            // If pure text failed for a non-quota reason and visual fallback is available, try fallback
             if (
               fallbackVisualPromptParts &&
               !primaryErrMsg.includes("RESOURCE_EXHAUSTED") &&
               !primaryErrMsg.includes("429") &&
               !primaryErrMsg.includes("quota")
             ) {
-              console.warn(`Pure text attempt failed, trying visual fallback for key #${keyIdx + 1}...`);
+              console.warn(`Pure text attempt failed on ${modelName}, trying visual fallback...`);
               result = await model.generateContent(fallbackVisualPromptParts);
             } else {
               throw primaryErr;
@@ -229,21 +234,14 @@ PANDUAN DETEKSI GAMBAR (DIAGRAM SOAL & GAMBAR OPSI):
           }
         } catch (err: unknown) {
           const errorMsg = err instanceof Error ? err.message : String(err);
+          const shortErr = errorMsg.length > 90 ? `${errorMsg.slice(0, 90)}...` : errorMsg;
+          triedLog.push(`Key #${keyIdx + 1} [${modelName}]: ${shortErr}`);
           console.warn(`Key #${keyIdx + 1} model ${modelName} failed (${errorMsg})`);
           lastError = err instanceof Error ? err : new Error(errorMsg);
 
-          // If quota exhausted (429) and there is a backup key, rotate to next key immediately
-          if (
-            (errorMsg.includes("RESOURCE_EXHAUSTED") || errorMsg.includes("429") || errorMsg.includes("quota")) &&
-            keyIdx < apiKeys.length - 1
-          ) {
-            console.warn(`Key #${keyIdx + 1} hit quota limit, rotating to backup key #${keyIdx + 2}...`);
-            break; // breaks out of model loop and advances to next key!
-          }
-
-          // If it's a network/connection failure, pause briefly before retrying
+          // If network failure, brief backoff
           if (errorMsg.includes("fetch failed") || errorMsg.includes("ENOTFOUND") || errorMsg.includes("ETIMEDOUT")) {
-            await new Promise((r) => setTimeout(r, 600));
+            await new Promise((r) => setTimeout(r, 400));
           }
         }
       }
@@ -325,6 +323,19 @@ PANDUAN DETEKSI GAMBAR (DIAGRAM SOAL & GAMBAR OPSI):
       userFriendlyError = "Dokumen PDF tidak dapat diproses karena terdeteksi filter konten Google Gemini. Pastikan isi dokumen sesuai materi edukasi.";
     }
 
-    return NextResponse.json({ error: userFriendlyError, rawDetails: rawError }, { status: 500 });
+    return NextResponse.json(
+      {
+        error: userFriendlyError,
+        rawDetails: rawError,
+        diagnostics: {
+          hasDigitalText: digitalTextResult?.hasDigitalText ?? false,
+          charCount: digitalTextResult?.charCount ?? 0,
+          pageCount: digitalTextResult?.pageCount ?? 0,
+          keysTested: apiKeys.length,
+          triedLog,
+        },
+      },
+      { status: 500 }
+    );
   }
 }

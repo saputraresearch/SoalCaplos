@@ -40,6 +40,13 @@ export default function CreateQuizPage() {
   const [isDragOver, setIsDragOver] = useState(false);
   const [isParsing, setIsParsing] = useState(false);
   const [parseError, setParseError] = useState<string | null>(null);
+  const [parseDiagnostics, setParseDiagnostics] = useState<{
+    hasDigitalText: boolean;
+    charCount: number;
+    pageCount: number;
+    keysTested: number;
+    triedLog: string[];
+  } | null>(null);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
 
   // Parsed Quiz Data
@@ -167,6 +174,7 @@ export default function CreateQuizPage() {
 
     setIsParsing(true);
     setParseError(null);
+    setParseDiagnostics(null);
 
     const customApiKey = typeof window !== "undefined" ? localStorage.getItem("quizcaplos_gemini_api_key") || "" : "";
     let customModel = typeof window !== "undefined" ? localStorage.getItem("quizcaplos_gemini_model") || "gemini-2.0-flash" : "gemini-2.0-flash";
@@ -214,6 +222,9 @@ export default function CreateQuizPage() {
       const parsedResult = await safeParseResponseJson(res);
 
       if (!parsedResult.ok || !parsedResult.data) {
+        if (parsedResult.data?.diagnostics) {
+          setParseDiagnostics(parsedResult.data.diagnostics);
+        }
         const errorText = parsedResult.error || "Gagal memproses dokumen PDF.";
         if (
           errorText.includes("API Key is missing") ||
@@ -697,6 +708,36 @@ export default function CreateQuizPage() {
                   <p className="text-xs text-red-700 leading-relaxed break-words">{parseError}</p>
                 </div>
               </div>
+
+              {parseDiagnostics && (
+                <div className="p-3 bg-white/90 border border-red-200/90 rounded-xl text-xs space-y-1.5 text-slate-700 shadow-xs">
+                  <div className="font-bold text-slate-800 flex items-center gap-1.5">
+                    <span>🔍 Hasil Diagnostik Ekstraksi:</span>
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 text-[11px]">
+                    <div className="flex items-center gap-1">
+                      <span className="text-slate-500">• Status Dokumen:</span>
+                      <span className="font-bold text-slate-800">
+                        {parseDiagnostics.hasDigitalText
+                          ? `Teks Digital Terdeteksi (${parseDiagnostics.charCount} karakter, ${parseDiagnostics.pageCount} halaman)`
+                          : "Dokumen Scan/Foto (Tidak ada teks digital)"}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <span className="text-slate-500">• API Key Diuji:</span>
+                      <span className="font-bold text-slate-800">{parseDiagnostics.keysTested} key aktif</span>
+                    </div>
+                  </div>
+                  {parseDiagnostics.triedLog && parseDiagnostics.triedLog.length > 0 && (
+                    <div className="text-[10px] font-mono text-slate-600 bg-slate-50 p-2 rounded-lg border border-slate-200/80 max-h-24 overflow-y-auto space-y-0.5 mt-1">
+                      <div className="font-bold text-slate-700">Riwayat Model yang Dicoba:</div>
+                      {parseDiagnostics.triedLog.map((log: string, idx: number) => (
+                        <div key={idx} className="truncate">• {log}</div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
 
               <div className="flex flex-wrap items-center gap-2 pt-1 border-t border-red-200/60">
                 <button
