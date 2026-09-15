@@ -108,6 +108,32 @@ function normalizeRawQuestions(rawQuestions: any[]): any[] {
   });
 }
 
+function deduplicateQuestions(questions: any[]): any[] {
+  const seenTexts = new Set<string>();
+  const unique: any[] = [];
+
+  for (const q of questions) {
+    const rawText = (q.question_text || "").trim();
+    // Normalize question text for duplicate detection (remove numbering like "1. ")
+    const normalized = rawText
+      .replace(/^(?:No\.?\s*)?\d{1,2}[\.\)\s]+/i, "")
+      .toLowerCase()
+      .replace(/\s+/g, " ")
+      .trim();
+
+    const key = normalized.length >= 5 ? normalized : rawText;
+    if (!seenTexts.has(key)) {
+      seenTexts.add(key);
+      unique.push(q);
+    }
+  }
+
+  return unique.map((q, idx) => ({
+    ...q,
+    order_index: idx,
+  }));
+}
+
 /**
  * Detect question numbers in document text to estimate total questions.
  */
@@ -267,12 +293,44 @@ export async function parseQuizWithClientDirect(options: {
   const docMeta = detectDocumentQuestionCount(fullText);
   console.log(`[ClientDirect] Detected ~${docMeta.count} questions (highest number: ${docMeta.maxNumber})`);
 
+  const expectedTotal = Math.max(docMeta.maxNumber, docMeta.count);
+  console.log(`[ClientDirect] Expected total questions: ${expectedTotal} (maxNumber: ${docMeta.maxNumber}, detectedCount: ${docMeta.count})`);
+
   let countDirective = "";
-  if (docMeta.maxNumber >= 5) {
-    countDirective = `\n\n⚠️ PERHATIAN SANGAT KRUSIAL:\nDokumen ini terdeteksi memuat soal bernomor hingga nomor ${docMeta.maxNumber} (sekitar ${docMeta.count} butir soal).\nKamu WAJIB mengekstrak SEMUA butir soal dari nomor pertama sampai nomor ${docMeta.maxNumber} tanpa terlewat satupun!\nDILARANG KERAS berhenti di tengah jalan atau hanya mengekstrak 1-4 soal!`;
+  if (expectedTotal >= 5) {
+    countDirective = `\n\n⚠️ PERHATIAN SANGAT KRUSIAL:\nDokumen ini terdeteksi memuat soal bernomor hingga nomor ${expectedTotal} (total sekitar ${expectedTotal} butir soal).\nKamu WAJIB mengekstrak SEMUA butir soal dari nomor pertama sampai nomor ${expectedTotal} tanpa terlewat satupun!\nDILARANG KERAS berhenti di tengah jalan atau hanya mengekstrak sebagian nomor! Buat penjelasan (explanation) ringkas (1-2 kalimat) agar semua butir soal muat lengkap.`;
   }
 
   const userPrompt = `DOKUMEN SUMBER UJIAN:\n\n${fullText}${countDirective}`;
+
+  // Helper to run continuation extraction if any questions are missing
+  const completeMissingQuestions = async (
+    initialQuestions: any[],
+    callModelFn: (prompt: string) => Promise<{ success: boolean; data?: any; error?: string }>
+  ): Promise<any[]> => {
+    let allQuestions = [...initialQuestions];
+    let pass = 1;
+
+    while (pass <= 3 && expectedTotal >= 5 && allQuestions.length < expectedTotal) {
+      pass++;
+      const currentCount = allQuestions.length;
+      console.log(`[ClientDirect] Pass ${pass - 1} returned ${currentCount}/${expectedTotal} questions. Running continuation pass ${pass}...`);
+
+      const nextStartNum = currentCount + 1;
+      const continuationPrompt = `DOKUMEN SUMBER UJIAN:\n\n${fullText}\n\n⚠️ INSTRUKSI LANJUTAN TAHAP ${pass} (SANGAT PENTING):\nPada tahap sebelumnya, baru diekstrak ${currentCount} butir soal (soal nomor 1 s/d nomor ${currentCount}).\nDokumen masih memiliki soal lanjutan mulai dari nomor ${nextStartNum} sampai nomor ${expectedTotal}.\nSekarang, EKSTRAK SELURUH SISA SOAL mulai dari nomor ${nextStartNum} hingga nomor ${expectedTotal} tanpa terlewat satupun!\nWajib kembalikan format JSON murni.`;
+
+      const passRes = await callModelFn(continuationPrompt);
+      if (passRes.success && Array.isArray(passRes.data?.questions) && passRes.data.questions.length > 0) {
+        const extra = normalizeRawQuestions(passRes.data.questions);
+        allQuestions = [...allQuestions, ...extra];
+        console.log(`[ClientDirect] After pass ${pass}: total ${allQuestions.length} questions collected.`);
+      } else {
+        break; // No more questions returned by model
+      }
+    }
+
+    return deduplicateQuestions(allQuestions);
+  };
 
   // 1. If user explicitly prioritizes Groq
   if (preferredProvider === "groq" && validGroqKey) {
@@ -280,22 +338,15 @@ export async function parseQuizWithClientDirect(options: {
       const res = await callGroqDirectFromBrowser(userPrompt, validGroqKey, gModel);
       if (res.success && res.data) {
         let rawQuestions = normalizeRawQuestions(res.data.questions || []);
-
-        // Continuation pass if model stopped early
-        if (docMeta.maxNumber >= 8 && rawQuestions.length <= docMeta.maxNumber * 0.5) {
-          const pass2Prompt = `DOKUMEN SUMBER UJIAN:\n\n${fullText}\n\n⚠️ INSTRUKSI KELENGKAPAN TAHAP 2:\nKamu baru mengekstrak ${rawQuestions.length} butir soal. Dokumen masih memiliki soal lanjutan sampai nomor ${docMeta.maxNumber}.\nSekarang, EKSTRAK SELURUH SISA SOAL dari nomor ${rawQuestions.length + 1} sampai nomor ${docMeta.maxNumber} tanpa terlewat!`;
-          const pass2 = await callGroqDirectFromBrowser(pass2Prompt, validGroqKey, gModel);
-          if (pass2.success && Array.isArray(pass2.data?.questions)) {
-            const extra = normalizeRawQuestions(pass2.data.questions);
-            rawQuestions = [...rawQuestions, ...extra];
-          }
-        }
+        rawQuestions = await completeMissingQuestions(rawQuestions, (p) =>
+          callGroqDirectFromBrowser(p, validGroqKey, gModel)
+        );
 
         onStep?.({
           id: "groq_direct",
           label: "Groq AI (Koneksi Browser)",
           status: "success",
-          detail: `Berhasil mengekstrak ${rawQuestions.length} butir soal dengan model: ${res.model}`,
+          detail: `Berhasil mengekstrak ${rawQuestions.length} butir soal lengkap dengan model: ${res.model}`,
         });
         return {
           success: true,
@@ -317,24 +368,15 @@ export async function parseQuizWithClientDirect(options: {
 
         if (res.success && res.data) {
           let rawQuestions = normalizeRawQuestions(res.data.questions || []);
-
-          // Continuation pass if model stopped early (e.g. only 4 questions when 20 exist)
-          if (docMeta.maxNumber >= 8 && rawQuestions.length <= docMeta.maxNumber * 0.5) {
-            console.log(`[ClientDirect] Gemini returned ${rawQuestions.length}/${docMeta.maxNumber} questions. Running continuation pass...`);
-            const pass2Prompt = `DOKUMEN SUMBER UJIAN:\n\n${fullText}\n\n⚠️ INSTRUKSI KELENGKAPAN TAHAP 2:\nPada tahap 1, kamu baru mengekstrak soal nomor 1 sampai ${rawQuestions.length}. Dokumen masih memiliki soal lanjutan sampai nomor ${docMeta.maxNumber}.\nSekarang, EKSTRAK SELURUH SISA SOAL dari nomor ${rawQuestions.length + 1} hingga nomor ${docMeta.maxNumber} tanpa terlewat satupun!`;
-            const pass2 = await callGeminiDirectFromBrowser(pass2Prompt, key, model);
-            if (pass2.success && Array.isArray(pass2.data?.questions) && pass2.data.questions.length > 0) {
-              const extra = normalizeRawQuestions(pass2.data.questions);
-              rawQuestions = [...rawQuestions, ...extra];
-              console.log(`[ClientDirect] Merged questions: total ${rawQuestions.length} questions!`);
-            }
-          }
+          rawQuestions = await completeMissingQuestions(rawQuestions, (p) =>
+            callGeminiDirectFromBrowser(p, key, model)
+          );
 
           onStep?.({
             id: `gemini_direct_key${kIdx + 1}`,
             label: `Gemini AI (Koneksi Browser - Key #${kIdx + 1})`,
             status: "success",
-            detail: `Berhasil mengekstrak ${rawQuestions.length} butir soal dengan model: ${model}`,
+            detail: `Berhasil mengekstrak ${rawQuestions.length} butir soal lengkap dengan model: ${model}`,
           });
 
           return {
@@ -364,20 +406,15 @@ export async function parseQuizWithClientDirect(options: {
       const res = await callGroqDirectFromBrowser(userPrompt, validGroqKey, gModel);
       if (res.success && res.data) {
         let rawQuestions = normalizeRawQuestions(res.data.questions || []);
-        if (docMeta.maxNumber >= 8 && rawQuestions.length <= docMeta.maxNumber * 0.5) {
-          const pass2Prompt = `DOKUMEN SUMBER UJIAN:\n\n${fullText}\n\n⚠️ INSTRUKSI KELENGKAPAN TAHAP 2:\nKamu baru mengekstrak ${rawQuestions.length} butir soal. Dokumen masih memiliki soal lanjutan sampai nomor ${docMeta.maxNumber}.\nSekarang, EKSTRAK SELURUH SISA SOAL dari nomor ${rawQuestions.length + 1} sampai nomor ${docMeta.maxNumber}!`;
-          const pass2 = await callGroqDirectFromBrowser(pass2Prompt, validGroqKey, gModel);
-          if (pass2.success && Array.isArray(pass2.data?.questions)) {
-            const extra = normalizeRawQuestions(pass2.data.questions);
-            rawQuestions = [...rawQuestions, ...extra];
-          }
-        }
+        rawQuestions = await completeMissingQuestions(rawQuestions, (p) =>
+          callGroqDirectFromBrowser(p, validGroqKey, gModel)
+        );
 
         onStep?.({
           id: "groq_direct",
           label: "Groq AI (Koneksi Browser)",
           status: "success",
-          detail: `Berhasil mengekstrak ${rawQuestions.length} butir soal dengan model: ${res.model}`,
+          detail: `Berhasil mengekstrak ${rawQuestions.length} butir soal lengkap dengan model: ${res.model}`,
         });
         return {
           success: true,
