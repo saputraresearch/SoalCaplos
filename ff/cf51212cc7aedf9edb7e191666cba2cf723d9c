@@ -1,0 +1,14 @@
+scripts/test-p0-e2e.mjs
+  h_7310902349a227 177-179,187-189
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "ffcf51212cc7aedf9edb7e191666cba2cf723d9c",
+  "prompts": {},
+  "humans": {
+    "h_7310902349a227": {
+      "author": "saputra.a.pratama <saputra.a.pratama@gdn-commerce.com>"
+    }
+  }
+}
