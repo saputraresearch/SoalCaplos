@@ -1,0 +1,18 @@
+src/app/api/generate-quiz/route.ts
+  h_7310902349a227 37,39,49-57,62-64,167-194
+src/app/api/parse-pdf/route.ts
+  h_7310902349a227 23,25,35-43,68,71,161-200,274
+src/components/SettingsModal.tsx
+  h_7310902349a227 82-89,94,99
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "46bb5c7654f95e996ba1b719a7db56b4be672a0e",
+  "prompts": {},
+  "humans": {
+    "h_7310902349a227": {
+      "author": "saputra.a.pratama <saputra.a.pratama@gdn-commerce.com>"
+    }
+  }
+}
