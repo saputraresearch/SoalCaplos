@@ -86,7 +86,8 @@ async function groqChatCompletion(
   const payload: any = {
     model,
     messages,
-    temperature: 0.2,
+    temperature: 0.1,
+    max_tokens: 8000,
   };
   if (useJsonFormat) {
     payload.response_format = { type: "json_object" };
@@ -125,16 +126,30 @@ function parseJsonSafely(content: string): any {
   }
 }
 
+function detectExpectedQuestions(text: string): number {
+  const matches = Array.from(text.matchAll(/(?:^|\n|\r)\s*(?:(?:No\.?|Soal)\s*)?\(?(\d{1,2})\)?[\.\:\)\s]/gi));
+  const numbers = Array.from(
+    new Set(matches.map((m) => parseInt(m[1], 10)).filter((n) => n >= 1 && n <= 100))
+  ).sort((a, b) => a - b);
+  return numbers.length > 0 ? Math.max(...numbers) : 0;
+}
+
 export async function parseQuizWithGroqText(
   fullText: string,
   systemPrompt: string,
   apiKey: string
 ): Promise<{ success: boolean; data?: any; error?: string; model?: string; triedModels?: string[] }> {
+  const expectedTotal = detectExpectedQuestions(fullText);
+  let countNote = "";
+  if (expectedTotal >= 5) {
+    countNote = `\n\n⚠️ PERHATIAN: Dokumen ini terdeteksi memiliki nomor soal hingga nomor ${expectedTotal}. Kamu WAJIB mengekstrak SEMUA ${expectedTotal} butir soal tanpa terlewat satupun! Selesaikan dan tentukan kunci jawaban A, B, C, atau D secara akurat.`;
+  }
+
   const messages = [
     { role: "system", content: systemPrompt },
     {
       role: "user",
-      content: `DOKUMEN SOAL (Teks digital resmi hasil ekstraksi dokumen PDF):\n\n${fullText}\n\nInstruksi: Ekstrak seluruh butir soal, pilihan jawaban (A, B, C, D), nomor soal, dan kunci jawaban/pembahasan ke dalam struktur JSON yang diminta. Wajib kembalikan format JSON murni.`,
+      content: `DOKUMEN SOAL (Teks digital resmi hasil ekstraksi dokumen PDF):\n\n${fullText}${countNote}\n\nInstruksi: Ekstrak seluruh butir soal, pilihan jawaban (A, B, C, D), nomor soal, dan kunci jawaban/pembahasan ke dalam struktur JSON yang diminta. Wajib kembalikan format JSON murni.`,
     },
   ];
 
@@ -179,7 +194,39 @@ export async function parseQuizWithGroqText(
         continue;
       }
 
-      const parsed = parseJsonSafely(content);
+      let parsed = parseJsonSafely(content);
+      let questionsList = Array.isArray(parsed?.questions) ? parsed.questions : [];
+
+      // Multi-pass continuation if Groq stopped early (e.g. only 6 out of 20 questions)
+      if (expectedTotal >= 8 && questionsList.length < expectedTotal) {
+        console.log(`[groqClient] Pass 1 returned ${questionsList.length}/${expectedTotal} questions. Continuing extraction for remaining questions...`);
+        const nextStart = questionsList.length + 1;
+        const pass2Messages = [
+          { role: "system", content: systemPrompt },
+          {
+            role: "user",
+            content: `DOKUMEN SOAL:\n\n${fullText}\n\n⚠️ INSTRUKSI LANJUTAN:\nPada tahap sebelumnya baru diekstrak ${questionsList.length} soal (nomor 1 s/d ${questionsList.length}).\nDokumen masih memiliki soal nomor ${nextStart} sampai ${expectedTotal}.\nSekarang, EKSTRAK SELURUH SISA SOAL dari nomor ${nextStart} hingga nomor ${expectedTotal} tanpa terlewat satupun! Kembalikan JSON dengan array "questions".`,
+          },
+        ];
+
+        const pass2Res = await groqChatCompletion(model, pass2Messages, apiKey);
+        if (pass2Res.ok) {
+          const pass2Content = pass2Res.body?.choices?.[0]?.message?.content;
+          if (pass2Content) {
+            const pass2Parsed = parseJsonSafely(pass2Content);
+            if (Array.isArray(pass2Parsed?.questions) && pass2Parsed.questions.length > 0) {
+              questionsList = [...questionsList, ...pass2Parsed.questions];
+              console.log(`[groqClient] Merged questions: now ${questionsList.length} total questions.`);
+            }
+          }
+        }
+      }
+
+      parsed = {
+        ...parsed,
+        questions: questionsList,
+      };
+
       return { success: true, data: parsed, model, triedModels };
     } catch (err: unknown) {
       lastError = err instanceof Error ? err.message : String(err);
@@ -295,3 +342,48 @@ export async function generateQuizWithGroq(
 
   return { success: false, error: `Semua Groq model gagal. Error: ${lastError}` };
 }
+
+export async function parseRemainingQuestionsWithGroq(
+  fullText: string,
+  fromIndex: number,
+  toIndex: number,
+  systemPrompt: string,
+  apiKey: string
+): Promise<{ success: boolean; data?: any; error?: string; model?: string }> {
+  const models = [
+    "llama-3.3-70b-versatile",
+    "llama-3.1-8b-instant",
+    "llama3-70b-8192",
+    "llama3-8b-8192",
+    "gemma2-9b-it",
+  ];
+
+  const userPrompt = `DOKUMEN SOAL ASLI (Teks Lengkap PDF):\n\n${fullText}\n\n⚠️ TUGAS SANGAT SPESIFIK & PENTING:\nSoal nomor 1 s/d ${fromIndex - 1} SUDAH diekstrak sebelumnya.\nSekarang, EKSTRAK HANYA soal nomor ${fromIndex} sampai nomor ${toIndex}.\n\nAturan:\n1. Ekstrak teks soal dan pilihan A, B, C, D (atau [___] jika isian rumpang) sesuai teks aslinya.\n2. Selesaikan/hitung jawabannya dan tentukan kunci jawaban yang benar (correct_answer_index) serta pembahasan singkat (explanation). DILARANG selalu memilih 0!\n3. Jangan buat soal di luar rentang nomor ${fromIndex} s/d ${toIndex}.\n4. Kembalikan JSON murni format: { "questions": [ { "question_text": "...", "question_type": "MULTIPLE_CHOICE", "options": ["A", "B", "C", "D"], "correct_answer_index": 0, "explanation": "..." } ] }`;
+
+  const messages = [
+    { role: "system", content: systemPrompt },
+    { role: "user", content: userPrompt },
+  ];
+
+  let lastError = "";
+  for (const model of models) {
+    try {
+      const res = await groqChatCompletion(model, messages, apiKey);
+      if (!res.ok) {
+        lastError = `HTTP ${res.status}`;
+        continue;
+      }
+      const content = res.body?.choices?.[0]?.message?.content;
+      if (!content) continue;
+      const parsed = parseJsonSafely(content);
+      if (Array.isArray(parsed?.questions) && parsed.questions.length > 0) {
+        return { success: true, data: parsed, model };
+      }
+    } catch (err: unknown) {
+      lastError = err instanceof Error ? err.message : String(err);
+    }
+  }
+
+  return { success: false, error: `Gagal mengekstrak sisa soal dengan Groq: ${lastError}` };
+}
+

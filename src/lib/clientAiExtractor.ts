@@ -207,7 +207,7 @@ function deduplicateQuestions(questions: any[], expectedTotal = 0): any[] {
 /**
  * Detect question numbers in document text to estimate total questions.
  */
-function detectDocumentQuestionCount(text: string): { count: number; maxNumber: number } {
+export function detectDocumentQuestionCount(text: string): { count: number; maxNumber: number } {
   const matches = Array.from(text.matchAll(/(?:^|\n|\r)\s*(?:No\.?\s*)?(\d{1,2})[\.\)\s]/gi));
   const numbers = Array.from(
     new Set(matches.map((m) => parseInt(m[1], 10)).filter((n) => n >= 1 && n <= 100))
@@ -344,6 +344,8 @@ export async function parseQuizWithClientDirect(options: {
   error?: string;
   provider?: string;
   model?: string;
+  expectedTotal?: number;
+  fullText?: string;
 }> {
   const { fullText, geminiKeys, groqKey, preferredProvider, onStep } = options;
 
@@ -506,6 +508,8 @@ Kembalikan JSON dengan format:
           title: res.data.title || "Kuis Caplos",
           provider: "groq",
           model: res.model,
+          expectedTotal: expectedTotal > 0 ? expectedTotal : rawQuestions.length,
+          fullText,
         };
       }
     }
@@ -540,6 +544,8 @@ Kembalikan JSON dengan format:
             title: res.data.title || "Kuis Caplos",
             provider: "gemini",
             model,
+            expectedTotal: expectedTotal > 0 ? expectedTotal : rawQuestions.length,
+            fullText,
           };
         } else {
           console.warn(`[ClientGemini] Key #${kIdx + 1} (${model}) error:`, res.error);
@@ -580,6 +586,8 @@ Kembalikan JSON dengan format:
           title: res.data.title || "Kuis Caplos",
           provider: "groq",
           model: res.model,
+          expectedTotal: expectedTotal > 0 ? expectedTotal : rawQuestions.length,
+          fullText,
         };
       }
     }
@@ -591,3 +599,84 @@ Kembalikan JSON dengan format:
       "Gagal mengekstrak soal dengan Gemini & Groq via koneksi browser. Silakan periksa kembali API Key Anda di menu Pengaturan.",
   };
 }
+
+/**
+ * Extract remaining questions between fromIndex and toIndex.
+ * Supports both client-direct connection and serverless fallback.
+ */
+export async function extractRemainingQuestions(options: {
+  fullText: string;
+  fromIndex: number;
+  toIndex: number;
+  geminiKeys: string[];
+  groqKey?: string | null;
+  preferredProvider?: string | null;
+  preferredModel?: string | null;
+}): Promise<{
+  success: boolean;
+  questions: any[];
+  error?: string;
+  provider?: string;
+  model?: string;
+}> {
+  const { fullText, fromIndex, toIndex, geminiKeys, groqKey, preferredProvider, preferredModel } = options;
+  const validGroqKey = groqKey?.trim() || null;
+  const validGeminiKeys = geminiKeys.filter((k) => k && k.trim().length > 10);
+
+  const prompt = `DOKUMEN NASKAH SOAL:\n\n${fullText}\n\n⚠️ INSTRUKSI KHUSUS PENGAMBILAN SISA SOAL:\nSoal nomor 1 sampai ${fromIndex - 1} SUDAH diekstrak sebelumnya.\nSekarang, KAMU WAJIB HANYA MENGEKSTRAK SOAL NOMOR ${fromIndex} SAMPAI NOMOR ${toIndex} tanpa terlewat satupun!\n\nAturan Penting:\n1. Ekstrak teks pertanyaan dan nomor soal aslinya.\n2. Ekstrak pilihan opsi A, B, C, D atau biarkan [] jika isian.\n3. KERJAKAN DAN SELESAIKAN SOAL SECARA AKURAT untuk menentukan kunci jawaban (correct_answer_index) dan langkah penyelesaian ringkas (explanation). DILARANG SELALU MENGISI 0!\n4. Kembalikan JSON dengan format murni:\n{\n  "questions": [\n    {\n      "question_text": "...",\n      "question_type": "MULTIPLE_CHOICE" | "FILL_IN_THE_BLANKS",\n      "options": ["A", "B", "C", "D"],\n      "correct_answer_index": 0,\n      "explanation": "..."\n    }\n  ]\n}`;
+
+  // 1. Try browser Groq if available
+  if (preferredProvider === "groq" && validGroqKey) {
+    try {
+      const res = await callGroqDirectFromBrowser(prompt, validGroqKey, "llama-3.3-70b-versatile");
+      if (res.success && Array.isArray(res.data?.questions) && res.data.questions.length > 0) {
+        const normalized = normalizeRawQuestions(res.data.questions);
+        return { success: true, questions: normalized, provider: "groq", model: res.model };
+      }
+    } catch (e) {
+      console.warn("[ClientDirect] Groq remaining error:", e);
+    }
+  }
+
+  // 2. Try browser Gemini if available
+  if (validGeminiKeys.length > 0) {
+    for (const key of validGeminiKeys) {
+      try {
+        const res = await callGeminiDirectFromBrowser(prompt, key, preferredModel || "gemini-1.5-flash");
+        if (res.success && Array.isArray(res.data?.questions) && res.data.questions.length > 0) {
+          const normalized = normalizeRawQuestions(res.data.questions);
+          return { success: true, questions: normalized, provider: "gemini", model: res.model };
+        }
+      } catch (e) {
+        console.warn("[ClientDirect] Gemini remaining error:", e);
+      }
+    }
+  }
+
+  // 3. Fallback to serverless API /api/continue-extraction
+  try {
+    const headers: Record<string, string> = { "Content-Type": "application/json" };
+    if (validGroqKey) headers["x-groq-api-key"] = validGroqKey;
+    if (validGeminiKeys[0]) headers["x-gemini-api-key"] = validGeminiKeys[0];
+    if (preferredProvider) headers["x-ai-provider"] = preferredProvider;
+
+    const res = await fetch("/api/continue-extraction", {
+      method: "POST",
+      headers,
+      body: JSON.stringify({
+        fullText,
+        fromIndex,
+        toIndex,
+      }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (data.success && Array.isArray(data.questions) && data.questions.length > 0) {
+      const normalized = normalizeRawQuestions(data.questions);
+      return { success: true, questions: normalized, provider: data.provider || "server", model: data.model };
+    }
+    return { success: false, questions: [], error: data.error || "Gagal mengekstrak sisa soal." };
+  } catch (err) {
+    return { success: false, questions: [], error: err instanceof Error ? err.message : String(err) };
+  }
+}
+

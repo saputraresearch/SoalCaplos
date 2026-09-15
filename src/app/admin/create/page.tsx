@@ -21,6 +21,8 @@ import {
   ChevronDown,
   RotateCcw,
   Settings,
+  AlertTriangle,
+  Zap,
 } from "lucide-react";
 import { ParsedQuestion, QuestionType } from "@/lib/types";
 import SettingsModal from "@/components/SettingsModal";
@@ -32,7 +34,11 @@ import { createDefaultQuestion } from "@/lib/questionTemplates";
 import { reportClientError } from "@/components/ErrorTelemetry";
 import { safeParseResponseJson } from "@/lib/apiResponse";
 import ExtractionFlowPanel, { type ExtractionStep } from "@/components/ExtractionFlowPanel";
-import { parseQuizWithClientDirect } from "@/lib/clientAiExtractor";
+import {
+  parseQuizWithClientDirect,
+  detectDocumentQuestionCount,
+  extractRemainingQuestions,
+} from "@/lib/clientAiExtractor";
 
 
 export default function CreateQuizPage() {
@@ -56,12 +62,18 @@ export default function CreateQuizPage() {
 
   const [quizTitle, setQuizTitle] = useState("");
   const [questions, setQuestions] = useState<ParsedQuestion[]>([]);
+  const [extractedFullText, setExtractedFullText] = useState<string>("");
+  const [targetTotalCount, setTargetTotalCount] = useState<number>(20);
+  const [isContinuingExtraction, setIsContinuingExtraction] = useState<boolean>(false);
+  const [continueError, setContinueError] = useState<string | null>(null);
   const [extractionSummary, setExtractionSummary] = useState<{
     title: string;
     totalQuestions: number;
+    expectedTotal: number;
     breakdown: string;
     provider: string;
     model?: string;
+    fullText?: string;
   } | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [publishedSlug, setPublishedSlug] = useState<string | null>(null);
@@ -173,6 +185,71 @@ export default function CreateQuizPage() {
   };
 
   // Submit PDF to /api/parse-pdf
+  const handleContinueExtraction = async () => {
+    const textToUse = extractedFullText || extractionSummary?.fullText || "";
+    if (!textToUse) {
+      setToastMessage("Teks naskah tidak tersedia untuk kelanjutan ekstraksi. Silakan coba unggah ulang.");
+      return;
+    }
+
+    const currentCount = questions.length;
+    const target = Math.max(targetTotalCount, currentCount + 1);
+    const fromIndex = currentCount + 1;
+    const toIndex = target;
+
+    setIsContinuingExtraction(true);
+    setContinueError(null);
+
+    try {
+      const customApiKey = typeof window !== "undefined" ? localStorage.getItem("quizcaplos_gemini_api_key") || "" : "";
+      const customModel = typeof window !== "undefined" ? localStorage.getItem("quizcaplos_gemini_model") || "gemini-2.0-flash" : "gemini-2.0-flash";
+      const customGroqKey = typeof window !== "undefined" ? localStorage.getItem("quizcaplos_groq_api_key") || "" : "";
+      const customProvider = typeof window !== "undefined" ? localStorage.getItem("quizcaplos_ai_provider") || (customGroqKey ? "groq" : "auto") : "auto";
+      const geminiKeysList = customApiKey ? customApiKey.split(/[\s,\n;]+/).filter(Boolean) : [];
+
+      const result = await extractRemainingQuestions({
+        fullText: textToUse,
+        fromIndex,
+        toIndex,
+        geminiKeys: geminiKeysList,
+        groqKey: customGroqKey,
+        preferredProvider: customProvider,
+        preferredModel: customModel,
+      });
+
+      if (result.success && result.questions && result.questions.length > 0) {
+        const existingTexts = new Set(questions.map((q) => (q.question_text || "").trim().toLowerCase()));
+        const genuinelyNew = result.questions.filter((q) => !existingTexts.has((q.question_text || "").trim().toLowerCase()));
+
+        const questionsToAdd = (genuinelyNew.length > 0 ? genuinelyNew : result.questions).map((q, idx) => ({
+          ...q,
+          order_index: currentCount + idx,
+        }));
+
+        const merged = [...questions, ...questionsToAdd];
+        setQuestions(merged);
+
+        const isNowComplete = merged.length >= target;
+        setExtractionSummary((prev) => (prev ? {
+          ...prev,
+          totalQuestions: merged.length,
+          expectedTotal: Math.max(prev.expectedTotal, target, merged.length),
+          breakdown: isNowComplete ? `${merged.length} Butir Soal (Lengkap)` : `${merged.length} dari ${target} Soal`,
+        } : null));
+
+        setToastMessage(`✨ Berhasil mengekstrak ${questionsToAdd.length} soal tambahan! Total sekarang: ${merged.length} butir soal.`);
+        setTimeout(() => setToastMessage(null), 5000);
+      } else {
+        throw new Error(result.error || "Tidak ada butir soal baru yang berhasil diekstrak.");
+      }
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      setContinueError(msg);
+    } finally {
+      setIsContinuingExtraction(false);
+    }
+  };
+
   const handleParsePDF = async () => {
     if (!file) return;
 
@@ -254,6 +331,8 @@ export default function CreateQuizPage() {
         }
 
         if (extractData?.success && extractData?.hasDigitalText && extractData?.fullText) {
+          setExtractedFullText(extractData.fullText);
+
           // 2. Browser laptop langsung memanggil Gemini / Groq (IP Residential)
           const geminiKeysList = customApiKey
             ? customApiKey.split(/[\s,\n;]+/).filter(Boolean)
@@ -279,6 +358,10 @@ export default function CreateQuizPage() {
             const extractedQuestions = clientAiResult.questions;
             setQuestions(extractedQuestions);
 
+            const docMeta = detectDocumentQuestionCount(extractData.fullText);
+            const expectedCount = docMeta.maxNumber > 0 ? docMeta.maxNumber : (clientAiResult.expectedTotal || extractedQuestions.length);
+            setTargetTotalCount(expectedCount > 0 ? expectedCount : Math.max(20, extractedQuestions.length));
+
             const fillInCount = extractedQuestions.filter((q: any) => q.question_type === "FILL_IN_THE_BLANKS").length;
             const mcqCount = extractedQuestions.filter((q: any) => !q.question_type || q.question_type === "MULTIPLE_CHOICE").length;
             const otherCount = extractedQuestions.length - fillInCount - mcqCount;
@@ -294,9 +377,11 @@ export default function CreateQuizPage() {
             setExtractionSummary({
               title: detectedTitle,
               totalQuestions: extractedQuestions.length,
+              expectedTotal: expectedCount,
               breakdown: extraInfo || `${extractedQuestions.length} Butir Soal`,
               provider: providerName,
               model: clientAiResult.model,
+              fullText: extractData.fullText,
             });
 
             setToastMessage(
@@ -369,6 +454,14 @@ export default function CreateQuizPage() {
       const extractedQuestions = data.questions || [];
       setQuestions(extractedQuestions);
 
+      if (data.fullText) {
+        setExtractedFullText(data.fullText);
+      }
+
+      const docMetaFallback = data.fullText ? detectDocumentQuestionCount(data.fullText) : { maxNumber: 0 };
+      const expectedCountFallback = data.expectedTotal || (docMetaFallback.maxNumber > 0 ? docMetaFallback.maxNumber : extractedQuestions.length);
+      setTargetTotalCount(expectedCountFallback > 0 ? expectedCountFallback : Math.max(20, extractedQuestions.length));
+
       const fillInCount = extractedQuestions.filter((q: any) => q.question_type === "FILL_IN_THE_BLANKS").length;
       const mcqCount = extractedQuestions.filter((q: any) => !q.question_type || q.question_type === "MULTIPLE_CHOICE").length;
       const otherCount = extractedQuestions.length - fillInCount - mcqCount;
@@ -391,8 +484,10 @@ export default function CreateQuizPage() {
       setExtractionSummary({
         title: fallbackTitle,
         totalQuestions: extractedQuestions.length,
+        expectedTotal: expectedCountFallback,
         breakdown: extraInfo || `${extractedQuestions.length} Butir Soal`,
         provider: "Vercel Cloud AI",
+        fullText: data.fullText || "",
       });
 
       setToastMessage(
@@ -775,76 +870,199 @@ export default function CreateQuizPage() {
         </div>
       )}
 
-      {/* Extraction Success Summary Modal (Shows extraction details before entering question list) */}
-      {extractionSummary && (
-        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 animate-pop">
-          <div className="bg-white rounded-3xl max-w-lg w-full p-6 sm:p-8 shadow-2xl space-y-5 text-center relative border border-slate-100">
-            <div className="w-16 h-16 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mx-auto shadow-inner">
-              <CheckCircle2 className="w-9 h-9" />
-            </div>
+      {/* Extraction Success / Incomplete Summary Modal (Shows extraction details before entering question list) */}
+      {extractionSummary && (() => {
+        const isIncomplete = extractionSummary.expectedTotal > extractionSummary.totalQuestions;
+        return (
+          <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 animate-pop">
+            <div
+              className={`bg-white rounded-3xl max-w-lg w-full p-6 sm:p-8 shadow-2xl space-y-5 text-center relative border ${
+                isIncomplete ? "border-amber-300 ring-4 ring-amber-100" : "border-slate-100"
+              }`}
+            >
+              {/* Icon */}
+              {isIncomplete ? (
+                <div className="w-16 h-16 bg-amber-100 text-amber-600 rounded-full flex items-center justify-center mx-auto shadow-inner animate-pulse">
+                  <AlertTriangle className="w-9 h-9" />
+                </div>
+              ) : (
+                <div className="w-16 h-16 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mx-auto shadow-inner">
+                  <CheckCircle2 className="w-9 h-9" />
+                </div>
+              )}
 
-            <div className="space-y-1.5">
-              <span className="px-3 py-1 rounded-full bg-emerald-50 text-emerald-700 text-xs font-bold border border-emerald-200 inline-block">
-                Ekstraksi Berhasil
-              </span>
-              <h2 className="text-2xl font-black text-slate-900">
-                Ditemukan {extractionSummary.totalQuestions} Butir Soal!
-              </h2>
-              <p className="text-xs text-slate-600 font-medium truncate max-w-md mx-auto">
-                Judul Dokumen: <span className="text-slate-800 font-bold">{extractionSummary.title}</span>
-              </p>
-            </div>
-
-            {/* Diagnostic Details */}
-            <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200 text-left space-y-2.5 text-xs">
-              <div className="flex justify-between items-center text-slate-600">
-                <span>Total Butir Soal:</span>
-                <span className="font-bold text-slate-900 text-sm bg-white px-2.5 py-0.5 rounded-lg border border-slate-200">
-                  {extractionSummary.totalQuestions} Soal
-                </span>
+              {/* Title & Badges */}
+              <div className="space-y-2">
+                {isIncomplete ? (
+                  <>
+                    <span className="px-3 py-1 rounded-full bg-amber-100 text-amber-800 text-xs font-black border border-amber-300 inline-flex items-center gap-1.5 shadow-xs">
+                      <AlertTriangle className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+                      Soal Belum Lengkap ({extractionSummary.totalQuestions} dari ~{extractionSummary.expectedTotal} Soal)
+                    </span>
+                    <h2 className="text-2xl font-black text-slate-900">
+                      Ditemukan {extractionSummary.totalQuestions} Butir Soal
+                    </h2>
+                    <p className="text-xs text-amber-800 font-medium max-w-md mx-auto leading-relaxed bg-amber-50 p-2.5 rounded-xl border border-amber-200">
+                      Dokumen terdeteksi memuat nomor soal hingga <strong>nomor {extractionSummary.expectedTotal}</strong>. Model AI terhenti di tengah jalan karena batas token. Anda dapat langsung melanjutkan ekstraksi sisa soal di bawah!
+                    </p>
+                  </>
+                ) : (
+                  <>
+                    <span className="px-3 py-1 rounded-full bg-emerald-50 text-emerald-700 text-xs font-bold border border-emerald-200 inline-block">
+                      Ekstraksi Lengkap & Berhasil
+                    </span>
+                    <h2 className="text-2xl font-black text-slate-900">
+                      Ditemukan {extractionSummary.totalQuestions} Butir Soal!
+                    </h2>
+                    <p className="text-xs text-slate-600 font-medium truncate max-w-md mx-auto">
+                      Judul Dokumen: <span className="text-slate-800 font-bold">{extractionSummary.title}</span>
+                    </p>
+                  </>
+                )}
               </div>
-              <div className="flex justify-between items-center text-slate-600">
-                <span>Komposisi Tipe:</span>
-                <span className="font-semibold text-indigo-700">{extractionSummary.breakdown}</span>
-              </div>
-              <div className="flex justify-between items-center text-slate-600">
-                <span>Mesin AI:</span>
-                <span className="font-semibold text-emerald-700">{extractionSummary.provider}</span>
-              </div>
-            </div>
 
-            {/* Riwayat Pipeline Steps */}
-            {extractionSteps.length > 0 && (
-              <div className="text-left bg-white p-3 rounded-xl border border-slate-200 max-h-44 overflow-y-auto">
-                <ExtractionFlowPanel steps={extractionSteps} />
+              {/* Target Total Question Count Adjuster (When Incomplete) */}
+              {isIncomplete && (
+                <div className="bg-slate-50 border border-slate-200 rounded-2xl p-3.5 text-left space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold text-slate-700">Target Total Soal Dokumen:</span>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="number"
+                        min={extractionSummary.totalQuestions + 1}
+                        max={100}
+                        value={targetTotalCount}
+                        onChange={(e) =>
+                          setTargetTotalCount(
+                            Math.max(
+                              extractionSummary.totalQuestions + 1,
+                              parseInt(e.target.value) || extractionSummary.totalQuestions + 1
+                            )
+                          )
+                        }
+                        className="w-16 px-2 py-1 text-center font-extrabold text-indigo-700 bg-white border border-indigo-300 rounded-lg shadow-inner focus:outline-hidden focus:ring-2 focus:ring-indigo-500 text-sm"
+                      />
+                      <span className="text-xs font-semibold text-slate-500">Soal</span>
+                    </div>
+                  </div>
+                  <p className="text-[11px] text-slate-500">
+                    Sistem akan mengekstrak sisa soal dari <strong>nomor {extractionSummary.totalQuestions + 1} sampai {targetTotalCount}</strong>.
+                  </p>
+                </div>
+              )}
+
+              {/* Diagnostic Details */}
+              <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200 text-left space-y-2 text-xs">
+                <div className="flex justify-between items-center text-slate-600">
+                  <span>Status Ekstraksi:</span>
+                  <span
+                    className={`font-bold text-xs px-2.5 py-0.5 rounded-lg border ${
+                      isIncomplete
+                        ? "bg-amber-100 text-amber-800 border-amber-300"
+                        : "bg-emerald-100 text-emerald-800 border-emerald-300"
+                    }`}
+                  >
+                    {isIncomplete
+                      ? `Baru ${extractionSummary.totalQuestions} dari ~${extractionSummary.expectedTotal} Soal`
+                      : "Semua Soal Lengkap"}
+                  </span>
+                </div>
+                <div className="flex justify-between items-center text-slate-600">
+                  <span>Komposisi Tipe:</span>
+                  <span className="font-semibold text-indigo-700">{extractionSummary.breakdown}</span>
+                </div>
+                <div className="flex justify-between items-center text-slate-600">
+                  <span>Mesin AI:</span>
+                  <span className="font-semibold text-emerald-700">{extractionSummary.provider}</span>
+                </div>
               </div>
-            )}
 
-            {/* Action Buttons */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
-              <button
-                type="button"
-                onClick={() => setExtractionSummary(null)}
-                className="w-full py-3.5 px-4 bg-indigo-600 text-white rounded-xl text-sm font-bold flex items-center justify-center gap-2 shadow-lg shadow-indigo-100 hover:bg-indigo-700 transition cursor-pointer"
-              >
-                <span>Buka Editor Soal ({extractionSummary.totalQuestions} Soal) ➔</span>
-              </button>
+              {/* Riwayat Pipeline Steps */}
+              {extractionSteps.length > 0 && (
+                <div className="text-left bg-white p-3 rounded-xl border border-slate-200 max-h-36 overflow-y-auto">
+                  <ExtractionFlowPanel steps={extractionSteps} />
+                </div>
+              )}
 
-              <button
-                type="button"
-                onClick={() => {
-                  setExtractionSummary(null);
-                  setQuestions([]);
-                  handleParsePDF();
-                }}
-                className="w-full py-3.5 px-4 bg-slate-100 text-slate-700 rounded-xl text-sm font-semibold hover:bg-slate-200 transition cursor-pointer"
-              >
-                Ekstrak Ulang
-              </button>
+              {/* Error display if continuation fails */}
+              {continueError && (
+                <div className="p-3 bg-red-50 border border-red-200 rounded-xl text-red-700 text-xs text-left font-medium">
+                  {continueError}
+                </div>
+              )}
+
+              {/* Action Buttons */}
+              <div className="space-y-2.5 pt-1">
+                {isIncomplete ? (
+                  <>
+                    <button
+                      type="button"
+                      disabled={isContinuingExtraction}
+                      onClick={handleContinueExtraction}
+                      className="w-full py-4 px-4 bg-gradient-to-r from-amber-500 via-orange-500 to-amber-600 hover:from-amber-600 hover:to-orange-600 text-white rounded-2xl text-sm font-extrabold flex items-center justify-center gap-2 shadow-lg shadow-orange-500/25 transition cursor-pointer active:scale-98 disabled:opacity-50"
+                    >
+                      {isContinuingExtraction ? (
+                        <>
+                          <Loader2 className="w-5 h-5 animate-spin" />
+                          <span>Mengekstrak Soal {extractionSummary.totalQuestions + 1} s/d {targetTotalCount}...</span>
+                        </>
+                      ) : (
+                        <>
+                          <Zap className="w-5 h-5 fill-current" />
+                          <span>⚡ Lanjutkan Ekstrak Sisa Soal (Soal {extractionSummary.totalQuestions + 1} s/d {targetTotalCount})</span>
+                        </>
+                      )}
+                    </button>
+
+                    <div className="grid grid-cols-2 gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setExtractionSummary(null)}
+                        className="w-full py-2.5 px-3 bg-slate-100 text-slate-700 rounded-xl text-xs font-bold hover:bg-slate-200 transition cursor-pointer"
+                      >
+                        Buka Editor ({extractionSummary.totalQuestions} Soal Saja)
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setExtractionSummary(null);
+                          setQuestions([]);
+                          handleParsePDF();
+                        }}
+                        className="w-full py-2.5 px-3 bg-slate-100 text-slate-700 rounded-xl text-xs font-bold hover:bg-slate-200 transition cursor-pointer"
+                      >
+                        Ekstrak Ulang Awal
+                      </button>
+                    </div>
+                  </>
+                ) : (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <button
+                      type="button"
+                      onClick={() => setExtractionSummary(null)}
+                      className="w-full py-3.5 px-4 bg-indigo-600 text-white rounded-xl text-sm font-bold flex items-center justify-center gap-2 shadow-lg shadow-indigo-100 hover:bg-indigo-700 transition cursor-pointer"
+                    >
+                      <span>Buka Editor Soal ({extractionSummary.totalQuestions} Soal) ➔</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setExtractionSummary(null);
+                        setQuestions([]);
+                        handleParsePDF();
+                      }}
+                      className="w-full py-3.5 px-4 bg-slate-100 text-slate-700 rounded-xl text-sm font-semibold hover:bg-slate-200 transition cursor-pointer"
+                    >
+                      Ekstrak Ulang
+                    </button>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
 
       {/* Restore Unsaved Draft Banner */}
       {hasSavedDraft && questions.length === 0 && (
@@ -1102,6 +1320,49 @@ export default function CreateQuizPage() {
               variant="top"
             />
           </div>
+
+          {/* Incomplete Extraction Helper Banner */}
+          {extractedFullText && targetTotalCount > questions.length && (
+            <div className="p-4 rounded-2xl bg-amber-50 border border-amber-300 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 animate-pop shadow-xs">
+              <div className="flex items-center gap-3 text-amber-900 text-sm">
+                <div className="w-10 h-10 rounded-xl bg-amber-200/80 text-amber-800 flex items-center justify-center shrink-0">
+                  <AlertTriangle className="w-5 h-5" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="font-bold text-slate-900">
+                      Baru {questions.length} dari ~{targetTotalCount} butir soal yang diekstrak
+                    </span>
+                    <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-amber-200 text-amber-900">
+                      Sisa {targetTotalCount - questions.length} Soal
+                    </span>
+                  </div>
+                  <p className="text-xs text-amber-800 mt-0.5">
+                    Naskah dokumen PDF memuat soal nomor {questions.length + 1} s/d {targetTotalCount}. Klik untuk mengekstrak sisa soal tanpa perlu mengetik manual.
+                  </p>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                disabled={isContinuingExtraction}
+                onClick={handleContinueExtraction}
+                className="px-4 py-2.5 bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-700 hover:to-orange-700 text-white rounded-xl text-xs font-bold flex items-center gap-2 shadow-sm transition shrink-0 cursor-pointer active:scale-95 disabled:opacity-50"
+              >
+                {isContinuingExtraction ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    <span>Mengekstrak Sisa Soal...</span>
+                  </>
+                ) : (
+                  <>
+                    <Zap className="w-4 h-4 fill-current" />
+                    <span>Ekstrak Sisa Soal ({questions.length + 1}-{targetTotalCount})</span>
+                  </>
+                )}
+              </button>
+            </div>
+          )}
 
           {/* Question Cards in Clean Preview Mode */}
           <div className="space-y-4">

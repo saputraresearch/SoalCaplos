@@ -462,11 +462,27 @@ PANDUAN DETEKSI GAMBAR (DIAGRAM SOAL & GAMBAR OPSI):
       });
     }
 
+    const textAvailable = digitalTextResult?.fullText || "";
+    let expectedTotal = enrichedQuestions.length;
+    if (textAvailable) {
+      const matches = Array.from(
+        textAvailable.matchAll(/(?:^|\n|\r)\s*(?:(?:No\.?|Soal)\s*)?\(?(\d{1,2})\)?[\.\:\)\s]/gi)
+      );
+      const numbers = Array.from(
+        new Set(matches.map((m: any) => parseInt(m[1], 10)).filter((n: number) => n >= 1 && n <= 100))
+      );
+      if (numbers.length > 0) {
+        expectedTotal = Math.max(...numbers);
+      }
+    }
+
     return NextResponse.json({
       title: detectedTitle,
       modelUsed: successfulModel,
       questions: enrichedQuestions,
       extractionSteps,
+      expectedTotal,
+      fullText: textAvailable,
     });
   } catch (error: unknown) {
     const rawError = error instanceof Error ? error.message : String(error);
