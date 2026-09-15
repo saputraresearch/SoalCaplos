@@ -47,9 +47,9 @@ export async function POST(req: NextRequest) {
     }
 
     const apiKeys = rawApiKey
-      .split(/[,\n;]+/)
+      .split(/[\s,\n;]+/)
       .map((k) => k.trim())
-      .filter((k) => k.length > 5);
+      .filter((k) => k.length > 10);
 
     if (apiKeys.length === 0) {
       return NextResponse.json({ error: "Gemini API Key is invalid or empty." }, { status: 400 });
