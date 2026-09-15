@@ -1,0 +1,26 @@
+package-lock.json
+  h_7310902349a227 14,18-19,676-685,687-872,1296-1304,2020,2341,2374,2654,2766,3731,4140,4151,4379,4919,4952,5139,5272,5374,5414-5418,5420-5443,5897,5914,6466,7010,7242
+package.json
+  h_7310902349a227 16,20-21
+src/app/admin/create/page.tsx
+  h_7310902349a227 200,216-218,234-236
+src/app/api/parse-pdf/route.ts
+  h_7310902349a227 76,78,80,220-242,244-253,255,257-280,283-300,306-309
+src/components/SettingsModal.tsx
+  h_7310902349a227 25,34-35,38-46,72,98-153
+src/lib/geminiModels.ts
+  h_7310902349a227 6-9,21-24
+src/lib/pdfTextExtractor.ts
+  h_7310902349a227 12,15-16,53
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "8f00ac50462272211713f493c49c44f6ef42b20a",
+  "prompts": {},
+  "humans": {
+    "h_7310902349a227": {
+      "author": "saputra.a.pratama <saputra.a.pratama@gdn-commerce.com>"
+    }
+  }
+}
