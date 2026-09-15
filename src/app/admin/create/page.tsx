@@ -54,9 +54,15 @@ export default function CreateQuizPage() {
 
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
 
-  // Parsed Quiz Data
   const [quizTitle, setQuizTitle] = useState("");
   const [questions, setQuestions] = useState<ParsedQuestion[]>([]);
+  const [extractionSummary, setExtractionSummary] = useState<{
+    title: string;
+    totalQuestions: number;
+    breakdown: string;
+    provider: string;
+    model?: string;
+  } | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [publishedSlug, setPublishedSlug] = useState<string | null>(null);
   const [createdQuizId, setCreatedQuizId] = useState<string | null>(null);
@@ -268,7 +274,8 @@ export default function CreateQuizPage() {
           });
 
           if (clientAiResult.success && clientAiResult.questions && clientAiResult.questions.length > 0) {
-            setQuizTitle(clientAiResult.title || file.name.replace(/\.[^/.]+$/, ""));
+            const detectedTitle = clientAiResult.title || file.name.replace(/\.[^/.]+$/, "");
+            setQuizTitle(detectedTitle);
             const extractedQuestions = clientAiResult.questions;
             setQuestions(extractedQuestions);
 
@@ -282,6 +289,16 @@ export default function CreateQuizPage() {
 
             const extraInfo = typeSummary.filter(Boolean).join(", ");
             const providerName = clientAiResult.provider === "gemini" ? "Google Gemini (Koneksi Langsung Browser)" : "Groq AI";
+
+            // Tampilkan popup konfirmasi & ringkasan hasil sebelum masuk ke editor soal
+            setExtractionSummary({
+              title: detectedTitle,
+              totalQuestions: extractedQuestions.length,
+              breakdown: extraInfo || `${extractedQuestions.length} Butir Soal`,
+              provider: providerName,
+              model: clientAiResult.model,
+            });
+
             setToastMessage(
               `✨ Berhasil mengekstrak ${extractedQuestions.length} butir soal via ${providerName}${extraInfo ? ` (${extraInfo})` : ""}!`
             );
@@ -347,7 +364,8 @@ export default function CreateQuizPage() {
         setExtractionSteps(data.extractionSteps);
       }
 
-      setQuizTitle(data.title || file.name.replace(/\.[^/.]+$/, ""));
+      const fallbackTitle = data.title || file.name.replace(/\.[^/.]+$/, "");
+      setQuizTitle(fallbackTitle);
       const extractedQuestions = data.questions || [];
       setQuestions(extractedQuestions);
 
@@ -369,6 +387,14 @@ export default function CreateQuizPage() {
       if (optImgCount > 0) imgSummary.push(`${optImgCount} gambar opsi`);
 
       const extraInfo = [typeSummary.join(", "), imgSummary.join(", ")].filter(Boolean).join(" | ");
+
+      setExtractionSummary({
+        title: fallbackTitle,
+        totalQuestions: extractedQuestions.length,
+        breakdown: extraInfo || `${extractedQuestions.length} Butir Soal`,
+        provider: "Vercel Cloud AI",
+      });
+
       setToastMessage(
         `✨ Berhasil mengekstrak ${extractedQuestions.length} butir soal${extraInfo ? ` (${extraInfo})` : ""}!`
       );
@@ -745,6 +771,77 @@ export default function CreateQuizPage() {
             >
               Close & Keep Editing
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* Extraction Success Summary Modal (Shows extraction details before entering question list) */}
+      {extractionSummary && (
+        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 animate-pop">
+          <div className="bg-white rounded-3xl max-w-lg w-full p-6 sm:p-8 shadow-2xl space-y-5 text-center relative border border-slate-100">
+            <div className="w-16 h-16 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mx-auto shadow-inner">
+              <CheckCircle2 className="w-9 h-9" />
+            </div>
+
+            <div className="space-y-1.5">
+              <span className="px-3 py-1 rounded-full bg-emerald-50 text-emerald-700 text-xs font-bold border border-emerald-200 inline-block">
+                Ekstraksi Berhasil
+              </span>
+              <h2 className="text-2xl font-black text-slate-900">
+                Ditemukan {extractionSummary.totalQuestions} Butir Soal!
+              </h2>
+              <p className="text-xs text-slate-600 font-medium truncate max-w-md mx-auto">
+                Judul Dokumen: <span className="text-slate-800 font-bold">{extractionSummary.title}</span>
+              </p>
+            </div>
+
+            {/* Diagnostic Details */}
+            <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200 text-left space-y-2.5 text-xs">
+              <div className="flex justify-between items-center text-slate-600">
+                <span>Total Butir Soal:</span>
+                <span className="font-bold text-slate-900 text-sm bg-white px-2.5 py-0.5 rounded-lg border border-slate-200">
+                  {extractionSummary.totalQuestions} Soal
+                </span>
+              </div>
+              <div className="flex justify-between items-center text-slate-600">
+                <span>Komposisi Tipe:</span>
+                <span className="font-semibold text-indigo-700">{extractionSummary.breakdown}</span>
+              </div>
+              <div className="flex justify-between items-center text-slate-600">
+                <span>Mesin AI:</span>
+                <span className="font-semibold text-emerald-700">{extractionSummary.provider}</span>
+              </div>
+            </div>
+
+            {/* Riwayat Pipeline Steps */}
+            {extractionSteps.length > 0 && (
+              <div className="text-left bg-white p-3 rounded-xl border border-slate-200 max-h-44 overflow-y-auto">
+                <ExtractionFlowPanel steps={extractionSteps} />
+              </div>
+            )}
+
+            {/* Action Buttons */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+              <button
+                type="button"
+                onClick={() => setExtractionSummary(null)}
+                className="w-full py-3.5 px-4 bg-indigo-600 text-white rounded-xl text-sm font-bold flex items-center justify-center gap-2 shadow-lg shadow-indigo-100 hover:bg-indigo-700 transition cursor-pointer"
+              >
+                <span>Buka Editor Soal ({extractionSummary.totalQuestions} Soal) ➔</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setExtractionSummary(null);
+                  setQuestions([]);
+                  handleParsePDF();
+                }}
+                className="w-full py-3.5 px-4 bg-slate-100 text-slate-700 rounded-xl text-sm font-semibold hover:bg-slate-200 transition cursor-pointer"
+              >
+                Ekstrak Ulang
+              </button>
+            </div>
           </div>
         </div>
       )}

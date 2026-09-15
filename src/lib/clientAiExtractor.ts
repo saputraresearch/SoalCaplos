@@ -4,36 +4,44 @@
  * Eliminates Vercel data center IP blocks, network timeouts, and AWS rate-limiting.
  */
 
-export const SYSTEM_PARSE_PROMPT = `Act strictly as an expert document transcriber, question type detector, and diagram analyzer. Extract the existing questions, options, and diagram/image information from the uploaded PDF document text exactly as written. Return structured JSON matching the quiz schema. Do not generate or invent new questions.
+export const SYSTEM_PARSE_PROMPT = `Act strictly as an expert document transcriber, exam parser, and question type detector.
+Extract EVERY SINGLE QUESTION and option from the uploaded document exactly as written.
 
-PANDUAN UTAMA DETEKSI TIPE SOAL (JANGAN MEMAKSAKAN SEMUA JADI PILIHAN GANDA!):
-1. JIKA SOAL ADALAH ISIAN SINGKAT / ISIAN RUMPANG:
-   - Cirinya: Soal berupa kalimat rumpang dengan titik-titik (.... atau ____), atau pertanyaan isian singkat tanpa pilihan ganda A, B, C, D di dokumen aslinya.
-   - JANGAN PERNAH membuat atau mengarang opsi pilihan ganda palsu jika di dokumen aslinya adalah soal isian!
+================================================================================
+ATURAN UTAMA & WAJIB: KELENGKAPAN BUTIR SOAL (EXTRACT ALL QUESTIONS WITHOUT EXCEPTION)
+================================================================================
+1. WAJIB EKSTRAK SEMUA BUTIR SOAL DARI AWAL HINGGA AKHIR DOKUMEN TANPA TERLEWAT SATUPUN!
+2. JIKA DOKUMEN BERISI 20 BUTIR SOAL (Soal No. 1 s/d 20), ARRAY "questions" WAJIB MEMILIKI TEPAT 20 OBJEK SOAL!
+3. DILARANG KERAS MEMOTONG, MENYINGKAT, ATAU HANYA MENGAMBIL SEBAGIAN KECIL SOAL (1-4 NOMOR) SEBAGAI CONTOH!
+4. Telusuri teks dari baris pertama sampai baris terakhir. Setiap kali ada nomor soal (misal "1.", "2.", "3.", dst.), buatkan objek soal tersendiri.
+5. Jangan pernah berhenti sebelum semua nomor soal di dokumen selesai diekstrak!
+
+PANDUAN DETEKSI TIPE SOAL:
+1. JIKA SOAL ISIAN SINGKAT / ISIAN RUMPANG:
+   - Cirinya: Kalimat rumpang dengan titik-titik (.... atau ____), tanpa pilihan A, B, C, D di naskah asli.
    - Set "question_type": "FILL_IN_THE_BLANKS"
-   - Masukkan tanda "[___]" pada bagian yang harus diisi siswa dalam "question_text".
-   - Set "blanks_keywords": ["kunci_jawaban_1", "kunci_jawaban_alternatif"].
-   - Set "options": [] (KOSONGKAN array options).
-   - Set "correct_answer_index": 0.
+   - Masukkan tanda "[___]" pada bagian yang harus diisi siswa.
+   - Set "blanks_keywords": ["kunci_jawaban_1"]
+   - Set "options": [] (wajib array kosong)
+   - Set "correct_answer_index": 0
 
-2. JIKA SOAL ADALAH PILIHAN GANDA BIASA (MCQ):
-   - Cirinya: Memiliki pilihan jawaban A, B, C, D tertulis di dokumen dengan 1 jawaban benar.
+2. JIKA SOAL PILIHAN GANDA BIASA (MCQ):
+   - Cirinya: Memiliki pilihan A, B, C, D dengan 1 jawaban benar.
    - Set "question_type": "MULTIPLE_CHOICE"
-   - Set "options": [ ... ] berisi pilihan opsi asli dari dokumen.
-   - Set "correct_answer_index": indeks 0-based opsi yang benar.
+   - Set "options": ["Opsi A", "Opsi B", "Opsi C", "Opsi D"] (Teks opsi bersih tanpa prefiks huruf ganda)
+   - Set "correct_answer_index": indeks 0-based opsi yang benar (0 untuk A, 1 untuk B, 2 untuk C, 3 untuk D).
 
-3. JIKA SOAL ADALAH PILIHAN GANDA KOMPLEKS:
-   - Cirinya: Memiliki pilihan opsi A, B, C, D dengan instruksi memilih lebih dari satu jawaban benar.
+3. JIKA SOAL PILIHAN GANDA KOMPLEKS:
    - Set "question_type": "MULTIPLE_SELECT"
-   - Set "options": [ ... ]
-   - Set "correct_answers": [indeks_opsi_benar_1, indeks_opsi_benar_2]
+   - Set "options": ["Opsi A", "Opsi B", "Opsi C", "Opsi D"]
+   - Set "correct_answers": [0, 1] (indeks semua jawaban yang benar)
 
-4. JIKA SOAL ADALAH URAIAN / ESAI:
+4. JIKA SOAL URAIAN / ESAI:
    - Set "question_type": "OPEN_ENDED"
-   - Set "rubric": ["poin_penilaian_1", "poin_penilaian_2"]
+   - Set "rubric": ["kriteria penilaian"]
    - Set "options": []
 
-5. JIKA SOAL ADALAH BENAR / SALAH:
+5. JIKA SOAL BENAR / SALAH:
    - Set "question_type": "TRUE_OR_FALSE"
    - Set "options": ["Benar", "Salah"]
 
@@ -43,8 +51,8 @@ Return JSON in this EXACT structure:
   "questions": [
     {
       "question_text": "Teks lengkap pertanyaan (gunakan [___] jika soal isian)",
-      "question_type": "FILL_IN_THE_BLANKS" | "MULTIPLE_CHOICE" | "MULTIPLE_SELECT" | "OPEN_ENDED" | "TRUE_OR_FALSE",
-      "options": ["A. Opsi 1", "B. Opsi 2", "C. Opsi 3", "D. Opsi 4"],
+      "question_type": "MULTIPLE_CHOICE" | "FILL_IN_THE_BLANKS" | "MULTIPLE_SELECT" | "OPEN_ENDED" | "TRUE_OR_FALSE",
+      "options": ["Opsi A", "Opsi B", "Opsi C", "Opsi D"],
       "correct_answer_index": 0,
       "correct_answers": [0],
       "blanks_keywords": ["kunci_isian"],
@@ -63,9 +71,58 @@ function cleanAndParseJson(text: string): any {
   return JSON.parse(cleaned);
 }
 
+function normalizeRawQuestions(rawQuestions: any[]): any[] {
+  if (!Array.isArray(rawQuestions)) return [];
+  return rawQuestions.map((q: any, idx: number) => {
+    const isFill =
+      q.question_type === "FILL_IN_THE_BLANKS" ||
+      /\[(?:_{2,}|\.{2,}|\s*_{2,}\s*)\]|_{3,}|\.{3,}/.test(q.question_text || "") ||
+      (Array.isArray(q.blanks_keywords) && q.blanks_keywords.length > 0 && (!q.options || q.options.length === 0));
+
+    let cleanOptions: string[] = [];
+    if (!isFill) {
+      if (Array.isArray(q.options)) {
+        cleanOptions = q.options.map((opt: any) => {
+          if (typeof opt === "string") return opt;
+          return opt.text || "";
+        });
+      }
+      if (cleanOptions.length === 0) {
+        cleanOptions = ["Pilihan A", "Pilihan B", "Pilihan C", "Pilihan D"];
+      }
+    }
+
+    return {
+      question_text: q.question_text || `Soal #${idx + 1}`,
+      question_type: isFill ? "FILL_IN_THE_BLANKS" : (q.question_type || "MULTIPLE_CHOICE"),
+      options: cleanOptions,
+      correct_answer_index: typeof q.correct_answer_index === "number" ? q.correct_answer_index : 0,
+      correct_answers: Array.isArray(q.correct_answers) ? q.correct_answers : [0],
+      blanks_keywords: Array.isArray(q.blanks_keywords) ? q.blanks_keywords : [],
+      explanation: q.explanation || "",
+      image_url: q.image_url || null,
+      image_source_type: "NONE",
+      alt_text: null,
+      order_index: idx,
+    };
+  });
+}
+
+/**
+ * Detect question numbers in document text to estimate total questions.
+ */
+function detectDocumentQuestionCount(text: string): { count: number; maxNumber: number } {
+  const matches = Array.from(text.matchAll(/(?:^|\n|\r)\s*(?:No\.?\s*)?(\d{1,2})[\.\)\s]/gi));
+  const numbers = Array.from(
+    new Set(matches.map((m) => parseInt(m[1], 10)).filter((n) => n >= 1 && n <= 100))
+  ).sort((a, b) => a - b);
+  const maxNumber = numbers.length > 0 ? Math.max(...numbers) : 0;
+  return { count: numbers.length, maxNumber };
+}
+
 /**
  * Direct call to Google Gemini from the browser.
- * Uses the user's residential/local IP, completely bypassing Vercel AWS IP limits.
+ * Uses maxOutputTokens: 8192 to prevent token truncation for 20+ questions.
  */
 export async function callGeminiDirectFromBrowser(
   prompt: string,
@@ -86,11 +143,12 @@ export async function callGeminiDirectFromBrowser(
         contents: [
           {
             role: "user",
-            parts: [{ text: `${SYSTEM_PARSE_PROMPT}\n\nDOKUMEN SUMBER:\n${prompt}` }],
+            parts: [{ text: `${SYSTEM_PARSE_PROMPT}\n\n${prompt}` }],
           },
         ],
         generationConfig: {
-          temperature: 0.2,
+          temperature: 0.1,
+          maxOutputTokens: 8192,
           responseMimeType: "application/json",
         },
       }),
@@ -138,10 +196,11 @@ export async function callGroqDirectFromBrowser(
         model,
         messages: [
           { role: "system", content: SYSTEM_PARSE_PROMPT },
-          { role: "user", content: `DOKUMEN SUMBER:\n\n${prompt}\n\nWajib format JSON murni.` },
+          { role: "user", content: `${prompt}\n\nWajib kembalikan format JSON murni.` },
         ],
         response_format: { type: "json_object" },
-        temperature: 0.2,
+        max_tokens: 8000,
+        temperature: 0.1,
       }),
     });
 
@@ -167,7 +226,8 @@ export async function callGroqDirectFromBrowser(
 
 /**
  * Orchestrator: Try Gemini first via browser direct connection.
- * Supports multi-key rotation and multi-model fallback.
+ * Detects total question count in text and performs continuation pass if needed
+ * to ensure 100% full extraction of all questions.
  */
 export async function parseQuizWithClientDirect(options: {
   fullText: string;
@@ -203,49 +263,80 @@ export async function parseQuizWithClientDirect(options: {
     "gemma2-9b-it",
   ];
 
+  // Detect expected question count from document text
+  const docMeta = detectDocumentQuestionCount(fullText);
+  console.log(`[ClientDirect] Detected ~${docMeta.count} questions (highest number: ${docMeta.maxNumber})`);
+
+  let countDirective = "";
+  if (docMeta.maxNumber >= 5) {
+    countDirective = `\n\n⚠️ PERHATIAN SANGAT KRUSIAL:\nDokumen ini terdeteksi memuat soal bernomor hingga nomor ${docMeta.maxNumber} (sekitar ${docMeta.count} butir soal).\nKamu WAJIB mengekstrak SEMUA butir soal dari nomor pertama sampai nomor ${docMeta.maxNumber} tanpa terlewat satupun!\nDILARANG KERAS berhenti di tengah jalan atau hanya mengekstrak 1-4 soal!`;
+  }
+
+  const userPrompt = `DOKUMEN SUMBER UJIAN:\n\n${fullText}${countDirective}`;
+
   // 1. If user explicitly prioritizes Groq
   if (preferredProvider === "groq" && validGroqKey) {
     for (const gModel of groqModels) {
-      const res = await callGroqDirectFromBrowser(fullText, validGroqKey, gModel);
+      const res = await callGroqDirectFromBrowser(userPrompt, validGroqKey, gModel);
       if (res.success && res.data) {
+        let rawQuestions = normalizeRawQuestions(res.data.questions || []);
+
+        // Continuation pass if model stopped early
+        if (docMeta.maxNumber >= 8 && rawQuestions.length <= docMeta.maxNumber * 0.5) {
+          const pass2Prompt = `DOKUMEN SUMBER UJIAN:\n\n${fullText}\n\n⚠️ INSTRUKSI KELENGKAPAN TAHAP 2:\nKamu baru mengekstrak ${rawQuestions.length} butir soal. Dokumen masih memiliki soal lanjutan sampai nomor ${docMeta.maxNumber}.\nSekarang, EKSTRAK SELURUH SISA SOAL dari nomor ${rawQuestions.length + 1} sampai nomor ${docMeta.maxNumber} tanpa terlewat!`;
+          const pass2 = await callGroqDirectFromBrowser(pass2Prompt, validGroqKey, gModel);
+          if (pass2.success && Array.isArray(pass2.data?.questions)) {
+            const extra = normalizeRawQuestions(pass2.data.questions);
+            rawQuestions = [...rawQuestions, ...extra];
+          }
+        }
+
         onStep?.({
           id: "groq_direct",
           label: "Groq AI (Koneksi Browser)",
           status: "success",
-          detail: `Berhasil dengan model: ${res.model}`,
+          detail: `Berhasil mengekstrak ${rawQuestions.length} butir soal dengan model: ${res.model}`,
         });
         return {
           success: true,
-          questions: res.data.questions || [],
+          questions: rawQuestions,
           title: res.data.title || "Kuis Caplos",
           provider: "groq",
           model: res.model,
         };
       }
     }
-    onStep?.({
-      id: "groq_direct",
-      label: "Groq AI (Koneksi Browser)",
-      status: "failed",
-      detail: "Semua model Groq gagal, beralih ke Gemini...",
-    });
   }
 
-  // 2. Try Gemini via Browser Direct Call (Uses user's home/work IP address)
+  // 2. Try Gemini via Browser Direct Call (Residential IP)
   if (validGeminiKeys.length > 0) {
     for (let kIdx = 0; kIdx < validGeminiKeys.length; kIdx++) {
       const key = validGeminiKeys[kIdx];
       for (const model of geminiModels) {
-        const res = await callGeminiDirectFromBrowser(fullText, key, model);
+        const res = await callGeminiDirectFromBrowser(userPrompt, key, model);
 
         if (res.success && res.data) {
-          const rawQuestions = res.data.questions || [];
+          let rawQuestions = normalizeRawQuestions(res.data.questions || []);
+
+          // Continuation pass if model stopped early (e.g. only 4 questions when 20 exist)
+          if (docMeta.maxNumber >= 8 && rawQuestions.length <= docMeta.maxNumber * 0.5) {
+            console.log(`[ClientDirect] Gemini returned ${rawQuestions.length}/${docMeta.maxNumber} questions. Running continuation pass...`);
+            const pass2Prompt = `DOKUMEN SUMBER UJIAN:\n\n${fullText}\n\n⚠️ INSTRUKSI KELENGKAPAN TAHAP 2:\nPada tahap 1, kamu baru mengekstrak soal nomor 1 sampai ${rawQuestions.length}. Dokumen masih memiliki soal lanjutan sampai nomor ${docMeta.maxNumber}.\nSekarang, EKSTRAK SELURUH SISA SOAL dari nomor ${rawQuestions.length + 1} hingga nomor ${docMeta.maxNumber} tanpa terlewat satupun!`;
+            const pass2 = await callGeminiDirectFromBrowser(pass2Prompt, key, model);
+            if (pass2.success && Array.isArray(pass2.data?.questions) && pass2.data.questions.length > 0) {
+              const extra = normalizeRawQuestions(pass2.data.questions);
+              rawQuestions = [...rawQuestions, ...extra];
+              console.log(`[ClientDirect] Merged questions: total ${rawQuestions.length} questions!`);
+            }
+          }
+
           onStep?.({
             id: `gemini_direct_key${kIdx + 1}`,
             label: `Gemini AI (Koneksi Browser - Key #${kIdx + 1})`,
             status: "success",
-            detail: `Berhasil dengan model: ${model}`,
+            detail: `Berhasil mengekstrak ${rawQuestions.length} butir soal dengan model: ${model}`,
           });
+
           return {
             success: true,
             questions: rawQuestions,
@@ -270,17 +361,27 @@ export async function parseQuizWithClientDirect(options: {
   // 3. Fallback to Groq if not tried yet
   if (validGroqKey && preferredProvider !== "groq") {
     for (const gModel of groqModels) {
-      const res = await callGroqDirectFromBrowser(fullText, validGroqKey, gModel);
+      const res = await callGroqDirectFromBrowser(userPrompt, validGroqKey, gModel);
       if (res.success && res.data) {
+        let rawQuestions = normalizeRawQuestions(res.data.questions || []);
+        if (docMeta.maxNumber >= 8 && rawQuestions.length <= docMeta.maxNumber * 0.5) {
+          const pass2Prompt = `DOKUMEN SUMBER UJIAN:\n\n${fullText}\n\n⚠️ INSTRUKSI KELENGKAPAN TAHAP 2:\nKamu baru mengekstrak ${rawQuestions.length} butir soal. Dokumen masih memiliki soal lanjutan sampai nomor ${docMeta.maxNumber}.\nSekarang, EKSTRAK SELURUH SISA SOAL dari nomor ${rawQuestions.length + 1} sampai nomor ${docMeta.maxNumber}!`;
+          const pass2 = await callGroqDirectFromBrowser(pass2Prompt, validGroqKey, gModel);
+          if (pass2.success && Array.isArray(pass2.data?.questions)) {
+            const extra = normalizeRawQuestions(pass2.data.questions);
+            rawQuestions = [...rawQuestions, ...extra];
+          }
+        }
+
         onStep?.({
           id: "groq_direct",
           label: "Groq AI (Koneksi Browser)",
           status: "success",
-          detail: `Berhasil dengan model: ${res.model}`,
+          detail: `Berhasil mengekstrak ${rawQuestions.length} butir soal dengan model: ${res.model}`,
         });
         return {
           success: true,
-          questions: res.data.questions || [],
+          questions: rawQuestions,
           title: res.data.title || "Kuis Caplos",
           provider: "groq",
           model: res.model,
