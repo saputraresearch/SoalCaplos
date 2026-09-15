@@ -3,8 +3,10 @@
  */
 export function normalizeModelName(model?: string | null): string {
   if (!model) return "gemini-1.5-flash";
-  const clean = model.trim().replace(/^models\//, "");
-  if (clean === "gemini-1.5-pro") return "gemini-1.5-pro-latest";
+  let clean = model.trim().replace(/^models\//, "");
+  // Strip any "-latest" suffix because v1beta API deprecates -latest on 1.5-flash / 1.5-pro
+  clean = clean.replace(/-latest$/, "");
+  if (clean === "gemini-1.5-pro" || clean.startsWith("gemini-1.5-pro")) return "gemini-1.5-flash";
   if (
     clean.includes("3.6") ||
     clean.includes("2.5") ||
@@ -15,6 +17,10 @@ export function normalizeModelName(model?: string | null): string {
     clean === "gemini-2.5-pro"
   ) {
     return "gemini-2.0-flash";
+  }
+  const valid = ["gemini-1.5-flash", "gemini-2.0-flash", "gemini-1.5-flash-8b"];
+  if (!valid.includes(clean)) {
+    return "gemini-1.5-flash";
   }
   return clean;
 }

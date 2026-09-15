@@ -9,10 +9,11 @@ export async function extractPdfDigitalText(pdfBuffer: Buffer): Promise<{
   pageCount: number;
   pageTexts: Array<{ pageNumber: number; text: string }>;
 }> {
-  // Method 1: Try pdfjs-dist
+  // Method 1: Try pdfjs-dist legacy build for Node.js
   try {
     // @ts-ignore
-    const pdfjs = (await import("pdfjs-dist/build/pdf.js")) as any;
+    let pdfjs = (await import("pdfjs-dist/legacy/build/pdf.js")) as any;
+    if (pdfjs?.default) pdfjs = pdfjs.default;
     if (pdfjs && typeof pdfjs.getDocument === "function") {
       const data = new Uint8Array(pdfBuffer);
       const loadingTask = pdfjs.getDocument({
@@ -49,7 +50,7 @@ export async function extractPdfDigitalText(pdfBuffer: Buffer): Promise<{
       }
     }
   } catch (err) {
-    console.warn("[pdfTextExtractor] pdfjs-dist extraction failed or unavailable, using fallback:", err);
+    console.warn("[pdfTextExtractor] pdfjs-dist legacy extraction failed or unavailable:", err);
   }
 
   // Method 2: Fast regex stream fallback for standard uncompressed / lightly compressed text

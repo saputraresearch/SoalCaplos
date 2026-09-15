@@ -22,6 +22,7 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
   const [ocrSpaceKey, setOcrSpaceKey] = useState("");
   const [showKeys, setShowKeys] = useState(false);
   const [model, setModel] = useState("gemini-1.5-flash");
+  const [aiProvider, setAiProvider] = useState<"auto" | "groq" | "gemini">("auto");
   const [saved, setSaved] = useState(false);
 
   useEffect(() => {
@@ -30,8 +31,18 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
       const [k1, ...rest] = storedKey.split(/[\s,\n;]+/).filter(Boolean);
       setPrimaryKey(k1 || "");
       setBackupKey(rest.join(",") || "");
-      setGroqApiKey(localStorage.getItem("quizcaplos_groq_api_key") || "");
+      const storedGroq = localStorage.getItem("quizcaplos_groq_api_key") || "";
+      setGroqApiKey(storedGroq);
       setOcrSpaceKey(localStorage.getItem("quizcaplos_ocrspace_key") || "");
+
+      const storedProvider = localStorage.getItem("quizcaplos_ai_provider") as "auto" | "groq" | "gemini" | null;
+      if (storedProvider) {
+        setAiProvider(storedProvider);
+      } else if (storedGroq) {
+        setAiProvider("groq");
+      } else {
+        setAiProvider("auto");
+      }
 
       let storedModel = localStorage.getItem("quizcaplos_gemini_model") || "gemini-1.5-flash";
       if (
@@ -58,6 +69,7 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
       localStorage.setItem("quizcaplos_groq_api_key", groqApiKey.trim());
       localStorage.setItem("quizcaplos_ocrspace_key", ocrSpaceKey.trim());
       localStorage.setItem("quizcaplos_gemini_model", model);
+      localStorage.setItem("quizcaplos_ai_provider", aiProvider);
       setSaved(true);
       setTimeout(() => {
         setSaved(false);
@@ -83,8 +95,62 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
             <Key className="w-6 h-6" />
           </div>
           <div>
-            <h3 className="text-lg font-extrabold text-slate-900">Pengaturan Gemini AI</h3>
-            <p className="text-xs text-slate-500">Kelola API Key & Model AI untuk ekstraksi PDF otomatis</p>
+            <h3 className="text-lg font-extrabold text-slate-900">Pengaturan AI & Ekstraksi</h3>
+            <p className="text-xs text-slate-500">Kelola Engine AI (Groq / Gemini) & API Key untuk ekstraksi soal</p>
+          </div>
+        </div>
+
+        {/* Pilihan Engine AI Utama */}
+        <div className="space-y-1.5 p-3.5 bg-slate-50 border border-slate-200 rounded-2xl">
+          <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 flex items-center justify-between">
+            <span className="flex items-center gap-1.5">
+              <Zap className="w-3.5 h-3.5 text-amber-500" />
+              <span>Prioritas Engine AI</span>
+            </span>
+            <span className="text-[10px] font-semibold text-amber-800 bg-amber-100/70 px-2 py-0.5 rounded-full">
+              {aiProvider === "groq" ? "Groq (Aktif)" : aiProvider === "gemini" ? "Gemini (Aktif)" : "Auto Fallback"}
+            </span>
+          </label>
+          <div className="grid grid-cols-2 gap-2 pt-1">
+            <button
+              type="button"
+              onClick={() => setAiProvider("groq")}
+              className={`p-2.5 rounded-xl border text-left transition flex flex-col justify-between cursor-pointer ${
+                aiProvider === "groq"
+                  ? "bg-amber-50 border-amber-400 ring-2 ring-amber-300 text-amber-950 font-bold"
+                  : "bg-white border-slate-200 text-slate-700 hover:bg-slate-50"
+              }`}
+            >
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold flex items-center gap-1">
+                  ⚡ Groq Cloud
+                </span>
+                {aiProvider === "groq" && <Check className="w-3.5 h-3.5 text-amber-600" />}
+              </div>
+              <span className="text-[10px] text-amber-700 font-medium mt-1">
+                Bebas Limit (Anti 429) • Super Kilat
+              </span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setAiProvider("gemini")}
+              className={`p-2.5 rounded-xl border text-left transition flex flex-col justify-between cursor-pointer ${
+                aiProvider === "gemini"
+                  ? "bg-indigo-50 border-indigo-400 ring-2 ring-indigo-300 text-indigo-950 font-bold"
+                  : "bg-white border-slate-200 text-slate-700 hover:bg-slate-50"
+              }`}
+            >
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold flex items-center gap-1">
+                  ✨ Google Gemini
+                </span>
+                {aiProvider === "gemini" && <Check className="w-3.5 h-3.5 text-indigo-600" />}
+              </div>
+              <span className="text-[10px] text-indigo-700 font-medium mt-1">
+                Flash 1.5 / 2.0 (Google Studio)
+              </span>
+            </button>
           </div>
         </div>
 

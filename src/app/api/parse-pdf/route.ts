@@ -73,10 +73,11 @@ export async function POST(req: NextRequest) {
     const base64Data = pdfBuffer.toString("base64");
 
     const requestedModel = (req.headers.get("x-gemini-model") || (formData.get("model") as string | null))?.trim();
+    const preferredProvider = (req.headers.get("x-ai-provider") || (formData.get("ai_provider") as string | null) || (groqApiKey && apiKeys.length === 0 ? "groq" : "auto"))?.toLowerCase();
     // Prioritize high-throughput flash models with universal free tier availability
-    const candidateList = [requestedModel, "gemini-1.5-flash", "gemini-2.0-flash", "gemini-1.5-flash-8b", "gemini-1.5-flash-latest"].filter(Boolean) as string[];
+    const candidateList = [requestedModel, "gemini-1.5-flash", "gemini-2.0-flash", "gemini-1.5-flash-8b"].filter(Boolean) as string[];
     const modelsToTry = Array.from(new Set(candidateList.map((m) => normalizeModelName(m))));
-    console.log(`[parse-pdf] Candidate models to try in order:`, modelsToTry, `(Active keys: ${apiKeys.length})`);
+    console.log(`[parse-pdf] Provider preference: ${preferredProvider}, Candidate models:`, modelsToTry, `(Active Gemini keys: ${apiKeys.length}, Groq key: ${!!groqApiKey})`);
 
     const systemPrompt = `Act strictly as an expert document transcriber, question type detector, and diagram analyzer. Extract the existing questions, options, and diagram/image information from the uploaded PDF document exactly as written. Return structured JSON matching the quiz schema. Do not generate or invent new questions.
 
@@ -216,74 +217,96 @@ PANDUAN DETEKSI GAMBAR (DIAGRAM SOAL & GAMBAR OPSI):
     let successfulKeyIndex = 0;
     const triedLog: string[] = [];
 
-    keyLoop: for (let keyIdx = 0; keyIdx < apiKeys.length; keyIdx++) {
-      const currentApiKey = apiKeys[keyIdx];
-      const genAI = new GoogleGenerativeAI(currentApiKey);
+    const tryGroq = async (): Promise<boolean> => {
+      if (!groqApiKey) return false;
+      const textToUse = digitalTextResult?.fullText || "";
+      if (textToUse.length >= 20) {
+        console.log(`[parse-pdf] Executing Groq Cloud AI (LLaMA 3.3 70B) with ${textToUse.length} chars of text...`);
+        const groqRes = await parseQuizWithGroqText(textToUse, systemPrompt, groqApiKey);
+        if (groqRes.success && groqRes.data) {
+          responseText = JSON.stringify(groqRes.data);
+          successfulModel = "groq/llama-3.3-70b-versatile";
+          console.log("[parse-pdf] Groq LLaMA 3.3 70B parsing succeeded!");
+          return true;
+        } else {
+          const errMsg = groqRes.error || "Groq parsing failed.";
+          triedLog.push(`Groq [llama-3.3-70b]: ${errMsg.slice(0, 90)}`);
+          console.warn("[parse-pdf] Groq parsing failed:", errMsg);
+          lastError = new Error(errMsg);
+        }
+      } else {
+        console.warn("[parse-pdf] Groq requires digital text, but PDF has no text layer.");
+        triedLog.push("Groq: Memerlukan teks digital / OCR");
+      }
+      return false;
+    };
 
-      for (const modelName of modelsToTry) {
-        try {
-          console.log(`Attempting extraction with key #${keyIdx + 1} and model: ${modelName} (pureText=${digitalTextResult.hasDigitalText})`);
-          const model = genAI.getGenerativeModel({
-            model: modelName,
-            generationConfig: { responseMimeType: "application/json" },
-          });
+    // If Groq is preferred or only Groq is configured, run Groq first!
+    if ((preferredProvider === "groq" || apiKeys.length === 0) && groqApiKey) {
+      await tryGroq();
+    }
 
-          // Attempt with primary prompt (ultra-lightweight pure text if available)
-          let result;
+    // Run Gemini if response not yet obtained and Gemini keys are available
+    if (!responseText && apiKeys.length > 0) {
+      keyLoop: for (let keyIdx = 0; keyIdx < apiKeys.length; keyIdx++) {
+        const currentApiKey = apiKeys[keyIdx];
+        const genAI = new GoogleGenerativeAI(currentApiKey);
+
+        for (const modelName of modelsToTry) {
           try {
-            result = await model.generateContent(primaryPromptParts);
-          } catch (primaryErr: any) {
-            const primaryErrMsg = String(primaryErr?.message || primaryErr);
-            // If pure text failed for a non-quota reason and visual fallback is available, try fallback
-            if (
-              fallbackVisualPromptParts &&
-              !primaryErrMsg.includes("RESOURCE_EXHAUSTED") &&
-              !primaryErrMsg.includes("429") &&
-              !primaryErrMsg.includes("quota")
-            ) {
-              console.warn(`Pure text attempt failed on ${modelName}, trying visual fallback...`);
-              result = await model.generateContent(fallbackVisualPromptParts);
-            } else {
-              throw primaryErr;
+            console.log(`Attempting extraction with key #${keyIdx + 1} and model: ${modelName} (pureText=${digitalTextResult.hasDigitalText})`);
+            const model = genAI.getGenerativeModel({
+              model: modelName,
+              generationConfig: { responseMimeType: "application/json" },
+            });
+
+            // Attempt with primary prompt (ultra-lightweight pure text if available)
+            let result;
+            try {
+              result = await model.generateContent(primaryPromptParts);
+            } catch (primaryErr: any) {
+              const primaryErrMsg = String(primaryErr?.message || primaryErr);
+              // If pure text failed for a non-quota reason and visual fallback is available, try fallback
+              if (
+                fallbackVisualPromptParts &&
+                !primaryErrMsg.includes("RESOURCE_EXHAUSTED") &&
+                !primaryErrMsg.includes("429") &&
+                !primaryErrMsg.includes("quota")
+              ) {
+                console.warn(`Pure text attempt failed on ${modelName}, trying visual fallback...`);
+                result = await model.generateContent(fallbackVisualPromptParts);
+              } else {
+                throw primaryErr;
+              }
             }
-          }
 
-          responseText = result.response.text();
-          if (responseText) {
-            successfulModel = modelName;
-            successfulKeyIndex = keyIdx;
-            console.log(`Extraction succeeded with key #${keyIdx + 1} and model: ${modelName}`);
-            break keyLoop;
-          }
-        } catch (err: unknown) {
-          const errorMsg = err instanceof Error ? err.message : String(err);
-          const shortErr = errorMsg.length > 90 ? `${errorMsg.slice(0, 90)}...` : errorMsg;
-          triedLog.push(`Key #${keyIdx + 1} [${modelName}]: ${shortErr}`);
-          console.warn(`Key #${keyIdx + 1} model ${modelName} failed (${errorMsg})`);
-          lastError = err instanceof Error ? err : new Error(errorMsg);
+            responseText = result.response.text();
+            if (responseText) {
+              successfulModel = modelName;
+              successfulKeyIndex = keyIdx;
+              console.log(`Extraction succeeded with key #${keyIdx + 1} and model: ${modelName}`);
+              break keyLoop;
+            }
+          } catch (err: unknown) {
+            const errorMsg = err instanceof Error ? err.message : String(err);
+            const shortErr = errorMsg.length > 90 ? `${errorMsg.slice(0, 90)}...` : errorMsg;
+            triedLog.push(`Key #${keyIdx + 1} [${modelName}]: ${shortErr}`);
+            console.warn(`Key #${keyIdx + 1} model ${modelName} failed (${errorMsg})`);
+            lastError = err instanceof Error ? err : new Error(errorMsg);
 
-          // If network failure, brief backoff
-          if (errorMsg.includes("fetch failed") || errorMsg.includes("ENOTFOUND") || errorMsg.includes("ETIMEDOUT")) {
-            await new Promise((r) => setTimeout(r, 400));
+            // If network failure, brief backoff
+            if (errorMsg.includes("fetch failed") || errorMsg.includes("ENOTFOUND") || errorMsg.includes("ETIMEDOUT")) {
+              await new Promise((r) => setTimeout(r, 400));
+            }
           }
         }
       }
     }
 
-    // If Gemini models failed or no Gemini key was provided, try Groq Cloud AI!
-    if (!responseText && groqApiKey && digitalTextResult?.hasDigitalText) {
-      console.log(`[parse-pdf] Attempting Groq Cloud AI fallback (LLaMA 3.3 70B)...`);
-      const groqRes = await parseQuizWithGroqText(digitalTextResult.fullText, systemPrompt, groqApiKey);
-      if (groqRes.success && groqRes.data) {
-        responseText = JSON.stringify(groqRes.data);
-        successfulModel = "groq/llama-3.3-70b-versatile";
-        console.log("[parse-pdf] Groq LLaMA 3.3 70B parsing succeeded!");
-      } else {
-        const errMsg = groqRes.error || "Groq parsing failed.";
-        triedLog.push(`Groq [llama-3.3-70b]: ${errMsg.slice(0, 90)}`);
-        console.warn("[parse-pdf] Groq parsing failed:", errMsg);
-        lastError = new Error(errMsg);
-      }
+    // If Gemini models failed, try Groq Cloud AI as fallback!
+    if (!responseText && groqApiKey) {
+      console.log(`[parse-pdf] Gemini models failed, running Groq Cloud AI fallback...`);
+      await tryGroq();
     }
 
     if (!responseText) {
