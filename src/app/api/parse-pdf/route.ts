@@ -221,16 +221,16 @@ PANDUAN DETEKSI GAMBAR (DIAGRAM SOAL & GAMBAR OPSI):
       if (!groqApiKey) return false;
       const textToUse = digitalTextResult?.fullText || "";
       if (textToUse.length >= 20) {
-        console.log(`[parse-pdf] Executing Groq Cloud AI (LLaMA 3.3 70B) with ${textToUse.length} chars of text...`);
+        console.log(`[parse-pdf] Executing Groq Cloud AI with ${textToUse.length} chars of text...`);
         const groqRes = await parseQuizWithGroqText(textToUse, systemPrompt, groqApiKey);
         if (groqRes.success && groqRes.data) {
           responseText = JSON.stringify(groqRes.data);
-          successfulModel = "groq/llama-3.3-70b-versatile";
-          console.log("[parse-pdf] Groq LLaMA 3.3 70B parsing succeeded!");
+          successfulModel = `groq/${groqRes.model || "llama-4-scout"}`;
+          console.log(`[parse-pdf] Groq parsing succeeded with model: ${groqRes.model}`);
           return true;
         } else {
           const errMsg = groqRes.error || "Groq parsing failed.";
-          triedLog.push(`Groq [llama-3.3-70b]: ${errMsg.slice(0, 90)}`);
+          triedLog.push(`Groq: ${errMsg.slice(0, 120)}`);
           console.warn("[parse-pdf] Groq parsing failed:", errMsg);
           lastError = new Error(errMsg);
         }
