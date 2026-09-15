@@ -1,0 +1,21 @@
+src/app/admin/create/page.tsx
+  s_ee6ebcaf9060b9::t_2dc952d45f67c1 565,590,818,823
+src/app/api/parse-pdf/route.ts
+  s_ee6ebcaf9060b9::t_b62a00baef44fd 77-78
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "570c91330571848ddf3913463ac25d5d058e85fd",
+  "prompts": {},
+  "sessions": {
+    "s_ee6ebcaf9060b9": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "fe3db708-c94c-45c4-bfe5-95e64caebf8d",
+        "model": "claude-sonnet-5"
+      },
+      "human_author": "saputra.a.pratama <saputra.a.pratama@gdn-commerce.com>"
+    }
+  }
+}
