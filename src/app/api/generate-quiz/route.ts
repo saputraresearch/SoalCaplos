@@ -3,6 +3,7 @@ import { GoogleGenerativeAI } from "@google/generative-ai";
 import { ParsedQuestion, QuestionType } from "@/lib/types";
 import { logServerError } from "@/lib/serverLogger";
 import { getActiveGeminiModels } from "@/lib/geminiModels";
+import { generateQuizWithGroq } from "@/lib/groqClient";
 import dns from "dns";
 
 // Ensure Node.js resolves IPv4 addresses first to prevent 20s IPv6 timeouts / fetch failed errors
@@ -31,37 +32,37 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Topic/Materi kuis wajib diisi." }, { status: 400 });
     }
 
-    // Check for API key
+    // Check for API keys
     const headerKey = req.headers.get("x-gemini-api-key");
     const envKey = process.env.GEMINI_API_KEY;
     const rawApiKey = headerKey || (envKey !== "your-gemini-api-key" ? envKey : null);
+    const groqApiKey = req.headers.get("x-groq-api-key") || process.env.GROQ_API_KEY || null;
 
-    if (!rawApiKey) {
+    const apiKeys = (rawApiKey || "")
+      .split(/[\s,\n;]+/)
+      .map((k) => k.trim())
+      .filter((k) => k.length > 10);
+
+    if (apiKeys.length === 0 && !groqApiKey) {
       return NextResponse.json(
         {
           error:
-            "Gemini API Key is missing. Silakan atur Gemini API Key pada menu Settings atau .env.local.",
+            "API Key belum diatur. Silakan atur Gemini API Key atau Groq API Key pada menu Settings (ikon gerigi) di pojok kanan atas.",
         },
         { status: 400 }
       );
     }
 
-    const apiKeys = rawApiKey
-      .split(/[\s,\n;]+/)
-      .map((k) => k.trim())
-      .filter((k) => k.length > 10);
-
-    if (apiKeys.length === 0) {
-      return NextResponse.json({ error: "Gemini API Key is invalid or empty." }, { status: 400 });
-    }
-
     // Ensure Node.js resolves IPv4 first on every request
     dns.setDefaultResultOrder("ipv4first");
 
-    const requestedModel = req.headers.get("x-gemini-model")?.trim();
-    const allModels = await getActiveGeminiModels(apiKeys[0], requestedModel);
-    const modelsToTry = allModels.slice(0, 2);
-    console.log(`[generate-quiz] Selected models to try:`, modelsToTry, `(Active keys: ${apiKeys.length})`);
+    let modelsToTry: string[] = [];
+    if (apiKeys.length > 0) {
+      const requestedModel = req.headers.get("x-gemini-model")?.trim();
+      const allModels = await getActiveGeminiModels(apiKeys[0], requestedModel);
+      modelsToTry = allModels.slice(0, 2);
+      console.log(`[generate-quiz] Selected models to try:`, modelsToTry, `(Active keys: ${apiKeys.length})`);
+    }
 
     const selectedTypesText = types && types.length > 0
       ? `Buat soal yang berfokus pada tipe berikut: ${types.join(", ")}.`
@@ -195,22 +196,37 @@ Patuhi target usia dan tingkat kesulitan yang diinput. Gunakan Bahasa Indonesia 
       }
     }
 
-    if (!responseText) {
+    // Fallback to Groq LLaMA 3.3 if Gemini did not return response or hit quota
+    let parsedData: any = null;
+
+    if (!responseText && groqApiKey) {
+      console.log("[generate-quiz] Attempting generation with Groq Cloud AI (LLaMA 3.3 70B)...");
+      const groqUserPrompt = `Buatkan ${count} butir soal ujian mengenai topik "${topic.trim()}" untuk siswa usia "${targetAge || "12-15 tahun"}" dengan tingkat kesulitan "${difficulty || "Sedang"}". Kembalikan dalam format JSON murni sesuai schema.`;
+      const groqRes = await generateQuizWithGroq(systemPrompt, groqUserPrompt, groqApiKey);
+      if (groqRes.success && groqRes.data) {
+        parsedData = groqRes.data;
+      } else {
+        console.warn("[generate-quiz] Groq generation failed:", groqRes.error);
+      }
+    }
+
+    if (!parsedData && !responseText) {
       const errMsg = lastError?.message || "";
       if (errMsg.includes("fetch failed") || errMsg.includes("ENOTFOUND") || errMsg.includes("ETIMEDOUT")) {
         throw new Error(
           `Gagal menghubungi server Google Gemini API (koneksi jaringan / fetch failed). Pastikan perangkat terhubung ke internet dan API Key Gemini Anda di menu Settings valid.`
         );
       }
-      throw lastError || new Error("Gagal membuat soal dari seluruh model Gemini kandidat.");
+      throw lastError || new Error("Gagal membuat soal dari seluruh model AI kandidat.");
     }
 
-    const cleanJson = responseText
-      .replace(/^```json\s*/, "")
-      .replace(/\s*```$/, "")
-      .trim();
-
-    const parsedData = JSON.parse(cleanJson);
+    if (!parsedData && responseText) {
+      const cleanJson = responseText
+        .replace(/^```json\s*/, "")
+        .replace(/\s*```$/, "")
+        .trim();
+      parsedData = JSON.parse(cleanJson);
+    }
 
     // Normalize and validate output
     const validatedQuestions: ParsedQuestion[] = (parsedData.questions || []).map(

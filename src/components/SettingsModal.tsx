@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Key, Save, Check, ExternalLink, X, ShieldCheck, Cpu, Eye, EyeOff, Info, FileText } from "lucide-react";
+import { Key, Save, Check, ExternalLink, X, ShieldCheck, Cpu, Eye, EyeOff, Info, FileText, Zap } from "lucide-react";
 
 interface SettingsModalProps {
   isOpen: boolean;
@@ -9,15 +9,16 @@ interface SettingsModalProps {
 }
 
 const AVAILABLE_MODELS = [
-  { id: "gemini-2.0-flash", label: "Gemini 2.0 Flash (Direkomendasikan - Sangat Cepat & Cerdas)" },
-  { id: "gemini-1.5-flash", label: "Gemini 1.5 Flash (Standar Stabil & Efisien)" },
-  { id: "gemini-1.5-pro", label: "Gemini 1.5 Pro (Akurasi Tinggi - Penalaran Mendalam)" },
+  { id: "gemini-1.5-flash", label: "Gemini 1.5 Flash (Direkomendasikan - Paling Stabil)" },
+  { id: "gemini-2.0-flash", label: "Gemini 2.0 Flash (Generasi Baru - Super Cepat)" },
+  { id: "gemini-1.5-flash-8b", label: "Gemini 1.5 Flash-8B (Model Ringan Vision & OCR)" },
   { id: "gemini-2.0-flash-lite", label: "Gemini 2.0 Flash-Lite (Super Ringan)" },
 ];
 
 export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
   const [primaryKey, setPrimaryKey] = useState("");
   const [backupKey, setBackupKey] = useState("");
+  const [groqApiKey, setGroqApiKey] = useState("");
   const [ocrSpaceKey, setOcrSpaceKey] = useState("");
   const [showKeys, setShowKeys] = useState(false);
   const [model, setModel] = useState("gemini-1.5-flash");
@@ -29,6 +30,7 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
       const [k1, ...rest] = storedKey.split(/[\s,\n;]+/).filter(Boolean);
       setPrimaryKey(k1 || "");
       setBackupKey(rest.join(",") || "");
+      setGroqApiKey(localStorage.getItem("quizcaplos_groq_api_key") || "");
       setOcrSpaceKey(localStorage.getItem("quizcaplos_ocrspace_key") || "");
 
       let storedModel = localStorage.getItem("quizcaplos_gemini_model") || "gemini-1.5-flash";
@@ -39,7 +41,8 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
         storedModel === "gemini-3.6-flash" ||
         storedModel === "gemini-2.5-flash" ||
         storedModel === "gemini-2.5-pro" ||
-        storedModel === "gemini-2.0-flash-exp"
+        storedModel === "gemini-2.0-flash-exp" ||
+        storedModel.includes("-latest")
       ) {
         storedModel = "gemini-1.5-flash";
         localStorage.setItem("quizcaplos_gemini_model", "gemini-1.5-flash");
@@ -52,6 +55,7 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
     if (typeof window !== "undefined") {
       const combined = [primaryKey.trim(), backupKey.trim()].filter(Boolean).join(",");
       localStorage.setItem("quizcaplos_gemini_api_key", combined);
+      localStorage.setItem("quizcaplos_groq_api_key", groqApiKey.trim());
       localStorage.setItem("quizcaplos_ocrspace_key", ocrSpaceKey.trim());
       localStorage.setItem("quizcaplos_gemini_model", model);
       setSaved(true);
@@ -156,6 +160,38 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
           <p className="text-xs text-slate-500">
             Sistem otomatis menggunakan mode Hybrid Text untuk menghemat kuota hingga 90%.
           </p>
+        </div>
+
+        {/* Groq Cloud AI Key (Alternatif AI Tercepat & Kuota Longgar) */}
+        <div className="space-y-1.5 pt-3 border-t border-slate-100">
+          <div className="flex items-center justify-between">
+            <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
+              <Zap className="w-3.5 h-3.5 text-amber-500" />
+              <span>Groq API Key (AI Alternatif Bebas Limit)</span>
+            </label>
+            <span className="text-[10px] text-amber-700 bg-amber-50 px-2 py-0.5 rounded-md font-bold">
+              30 RPM • Super Cepat
+            </span>
+          </div>
+          <input
+            type={showKeys ? "text" : "password"}
+            value={groqApiKey}
+            onChange={(e) => setGroqApiKey(e.target.value)}
+            placeholder="gsk_... (Dapat dari console.groq.com)"
+            className="w-full px-4 py-2.5 rounded-xl border border-slate-300 text-sm font-mono focus:ring-2 focus:ring-amber-500 focus:outline-hidden"
+          />
+          <div className="flex items-center justify-between text-[11px] text-slate-500 pt-0.5">
+            <span>Daftar gratis di Groq (instan tanpa kartu kredit):</span>
+            <a
+              href="https://console.groq.com/keys"
+              target="_blank"
+              rel="noreferrer"
+              className="inline-flex items-center gap-1 text-amber-600 font-bold hover:underline"
+            >
+              <span>Buka Groq Console</span>
+              <ExternalLink className="w-3 h-3" />
+            </a>
+          </div>
         </div>
 
         {/* OCR.space Free API Key (Khusus PDF Scan / Foto Kamera) */}

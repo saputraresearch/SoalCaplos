@@ -70,10 +70,12 @@ export default function AiGenerateModal({ isOpen, onClose, onGenerated }: AiGene
 
     try {
       const apiKey = typeof window !== "undefined" ? localStorage.getItem("quizcaplos_gemini_api_key") : null;
+      const groqKey = typeof window !== "undefined" ? localStorage.getItem("quizcaplos_groq_api_key") : null;
       const model = typeof window !== "undefined" ? localStorage.getItem("quizcaplos_gemini_model") : null;
 
       const headers: Record<string, string> = { "Content-Type": "application/json" };
       if (apiKey) headers["x-gemini-api-key"] = apiKey;
+      if (groqKey) headers["x-groq-api-key"] = groqKey;
       if (model) headers["x-gemini-model"] = model;
 
       const res = await fetch("/api/generate-quiz", {

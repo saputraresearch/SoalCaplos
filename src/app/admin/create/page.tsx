@@ -196,6 +196,7 @@ export default function CreateQuizPage() {
     }
 
     const customOcrKey = typeof window !== "undefined" ? localStorage.getItem("quizcaplos_ocrspace_key") || "" : "";
+    const customGroqKey = typeof window !== "undefined" ? localStorage.getItem("quizcaplos_groq_api_key") || "" : "";
 
     const formData = new FormData();
     formData.append("file", file);
@@ -208,6 +209,9 @@ export default function CreateQuizPage() {
     if (customOcrKey) {
       formData.append("ocr_api_key", customOcrKey);
     }
+    if (customGroqKey) {
+      formData.append("groq_api_key", customGroqKey);
+    }
 
     try {
       const headers: Record<string, string> = {};
@@ -219,6 +223,9 @@ export default function CreateQuizPage() {
       }
       if (customOcrKey) {
         headers["x-ocrspace-api-key"] = customOcrKey;
+      }
+      if (customGroqKey) {
+        headers["x-groq-api-key"] = customGroqKey;
       }
 
       const res = await fetch("/api/parse-pdf", {

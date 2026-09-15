@@ -4,6 +4,7 @@ import { ParsedQuestion } from "@/lib/types";
 import { enrichQuestionsWithImages } from "@/lib/pdfImageExtractor";
 import { extractPdfDigitalText } from "@/lib/pdfTextExtractor";
 import { extractScannedPdfWithOcrSpace } from "@/lib/ocrSpace";
+import { parseQuizWithGroqText } from "@/lib/groqClient";
 import { getActiveGeminiModels, normalizeModelName } from "@/lib/geminiModels";
 import { logServerError } from "@/lib/serverLogger";
 import dns from "dns";
@@ -21,30 +22,31 @@ export async function POST(req: NextRequest) {
   try {
     const formData = await req.formData();
 
-    // Check for API key from header, formData, or environment variable
+    // Check for Groq API key
+    const groqApiKey = (req.headers.get("x-groq-api-key") || (formData.get("groq_api_key") as string | null) || process.env.GROQ_API_KEY)?.trim() || "";
+
+    // Check for Gemini API key from header, formData, or environment variable
     const headerKey = req.headers.get("x-gemini-api-key");
     const formKey = formData.get("api_key") as string | null;
     const envKey = process.env.GEMINI_API_KEY;
 
     const rawApiKey = headerKey || formKey || (envKey !== "your-gemini-api-key" ? envKey : null);
 
-    if (!rawApiKey) {
+    if (!rawApiKey && !groqApiKey) {
       return NextResponse.json(
         {
           error:
-            "Gemini API Key is missing. Please set your Gemini API Key in the Settings menu or in .env.local.",
+            "API Key belum diisi. Silakan masukkan Gemini API Key atau Groq API Key melalui menu Pengaturan (ikon gerigi di kanan atas).",
         },
         { status: 400 }
       );
     }
 
-    apiKeys = rawApiKey
-      .split(/[\s,\n;]+/)
-      .map((k) => k.trim())
-      .filter((k) => k.length > 10);
-
-    if (apiKeys.length === 0) {
-      return NextResponse.json({ error: "Gemini API Key is invalid or empty." }, { status: 400 });
+    if (rawApiKey) {
+      apiKeys = rawApiKey
+        .split(/[\s,\n;]+/)
+        .map((k) => k.trim())
+        .filter((k) => k.length > 10);
     }
 
     const file = formData.get("file") as File | null;
@@ -265,6 +267,22 @@ PANDUAN DETEKSI GAMBAR (DIAGRAM SOAL & GAMBAR OPSI):
             await new Promise((r) => setTimeout(r, 400));
           }
         }
+      }
+    }
+
+    // If Gemini models failed or no Gemini key was provided, try Groq Cloud AI!
+    if (!responseText && groqApiKey && digitalTextResult?.hasDigitalText) {
+      console.log(`[parse-pdf] Attempting Groq Cloud AI fallback (LLaMA 3.3 70B)...`);
+      const groqRes = await parseQuizWithGroqText(digitalTextResult.fullText, systemPrompt, groqApiKey);
+      if (groqRes.success && groqRes.data) {
+        responseText = JSON.stringify(groqRes.data);
+        successfulModel = "groq/llama-3.3-70b-versatile";
+        console.log("[parse-pdf] Groq LLaMA 3.3 70B parsing succeeded!");
+      } else {
+        const errMsg = groqRes.error || "Groq parsing failed.";
+        triedLog.push(`Groq [llama-3.3-70b]: ${errMsg.slice(0, 90)}`);
+        console.warn("[parse-pdf] Groq parsing failed:", errMsg);
+        lastError = new Error(errMsg);
       }
     }
 
