@@ -1,0 +1,23 @@
+scripts/test-multiple-select-bugfix.mjs
+  s_8b92f1e0230518::t_d276ab8e6384d6 1-146
+src/components/QuestionCardEditor.tsx
+  s_8b92f1e0230518::t_f3edfc4b0c62ec 20,64-67,390-407
+src/lib/geminiModels.ts
+  s_8b92f1e0230518::t_caa345b074a349 1-73
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "6891454a99cff5415493a8a74b7ac6f197871512",
+  "prompts": {},
+  "sessions": {
+    "s_8b92f1e0230518": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "814ec10c-5de9-4a4d-b7ee-fa3422c94f87",
+        "model": "claude-sonnet-5"
+      },
+      "human_author": "saputra.a.pratama <saputra.a.pratama@gdn-commerce.com>"
+    }
+  }
+}
