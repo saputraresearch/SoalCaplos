@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { ParsedQuestion } from "@/lib/types";
 import { enrichQuestionsWithImages } from "@/lib/pdfImageExtractor";
+import { extractPdfDigitalText } from "@/lib/pdfTextExtractor";
 import { getActiveGeminiModels } from "@/lib/geminiModels";
 import { logServerError } from "@/lib/serverLogger";
 import dns from "dns";
@@ -145,15 +146,40 @@ PANDUAN DETEKSI GAMBAR (DIAGRAM SOAL & GAMBAR OPSI):
    - Berikan "image_box": [ymin, xmin, ymax, xmax] (skala 0-1000).
    - Berikan "image_description": deskripsi gambar opsi tersebut.`;
 
-    const promptParts = [
-      systemPrompt,
-      {
-        inlineData: {
-          data: base64Data,
-          mimeType: "application/pdf",
-        },
-      },
-    ];
+    // Hybrid PDF Extraction (Ide 2): Extract digital text locally in 50ms
+    const digitalTextResult = await extractPdfDigitalText(pdfBuffer);
+    console.log(
+      `[parse-pdf] Hybrid text extraction: hasDigitalText=${digitalTextResult.hasDigitalText}, chars=${digitalTextResult.charCount}, pages=${digitalTextResult.pageCount}`
+    );
+
+    const promptPartsHybrid = digitalTextResult.hasDigitalText
+      ? [
+          systemPrompt,
+          `TEKS DIGITAL RESMI DIEKSTRAK DARI DOKUMEN PDF (Gunakan teks ini sebagai referensi utama teks soal):\n\n${digitalTextResult.fullText}`,
+          {
+            inlineData: {
+              data: base64Data,
+              mimeType: "application/pdf",
+            },
+          },
+        ]
+      : [
+          systemPrompt,
+          {
+            inlineData: {
+              data: base64Data,
+              mimeType: "application/pdf",
+            },
+          },
+        ];
+
+    // Ultra-lightweight fallback: Send ONLY the digital text (consumes ~90% fewer tokens and bypasses visual token TPM limits)
+    const promptPartsTextOnly = digitalTextResult.hasDigitalText
+      ? [
+          systemPrompt,
+          `TEKS DIGITAL DOKUMEN PDF (Mode hemat token / quota recovery):\n\n${digitalTextResult.fullText}`,
+        ]
+      : null;
 
     let responseText: string | null = null;
     let lastError: Error | null = null;
@@ -172,7 +198,28 @@ PANDUAN DETEKSI GAMBAR (DIAGRAM SOAL & GAMBAR OPSI):
             generationConfig: { responseMimeType: "application/json" },
           });
 
-          const result = await model.generateContent(promptParts);
+          // Attempt 1: Hybrid mode (digital text + PDF visual reference)
+          let result;
+          try {
+            result = await model.generateContent(promptPartsHybrid);
+          } catch (firstErr: any) {
+            const firstErrMsg = String(firstErr?.message || firstErr);
+            // If quota limit / TPM exceeded and we have extracted text, fallback to text-only mode instantly!
+            if (
+              promptPartsTextOnly &&
+              (firstErrMsg.includes("RESOURCE_EXHAUSTED") ||
+                firstErrMsg.includes("429") ||
+                firstErrMsg.includes("quota"))
+            ) {
+              console.warn(
+                `Visual prompt hit quota on key #${keyIdx + 1}, falling back to ultra-lightweight Text-Only mode...`
+              );
+              result = await model.generateContent(promptPartsTextOnly);
+            } else {
+              throw firstErr;
+            }
+          }
+
           responseText = result.response.text();
           if (responseText) {
             successfulModel = modelName;
