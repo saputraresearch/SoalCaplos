@@ -9,27 +9,31 @@ export default function Home() {
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-center">
           {/* Left Column: Copy & CTAs */}
           <div className="lg:col-span-7 space-y-6 text-center lg:text-left">
-            <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-caplos-yellow/20 border border-caplos-yellow text-caplos-navy text-xs font-bold shadow-xs">
-              <Sparkles className="w-4 h-4 text-caplos-yellow-700" />
-              <span>AI Multimodal Quiz Generator & Interactive Runner</span>
+            <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-caplos-blue-50 border border-caplos-blue-200 text-caplos-blue text-xs font-bold shadow-xs">
+              <Sparkles className="w-4 h-4 text-caplos-yellow-600" />
+              <span>Platform Asesmen & Kuis Pembelajaran AI</span>
             </div>
 
             <div className="space-y-3">
-              <h1 className="text-4xl sm:text-5xl font-black text-caplos-navy tracking-tight leading-tight">
-                Bikin Soal Kuis Cerdas dari PDF,{" "}
-                <span className="text-caplos-blue underline decoration-caplos-yellow decoration-wavy decoration-3">
-                  Menyenangkan
-                </span>{" "}
-                bagi Siswa!
+              <h1 className="text-6xl sm:text-7xl lg:text-8xl font-black tracking-tight text-caplos-blue flex items-center justify-center lg:justify-start gap-0.5 select-none">
+                <span>C</span>
+                <span className="text-caplos-yellow">A</span>
+                <span>PLOS</span>
               </h1>
-              <p className="text-lg sm:text-xl font-bold text-caplos-blue">
-                Create, Analyze & Personalize Learning Questions
-              </p>
+
+              <div className="space-y-1">
+                <h2 className="text-2xl sm:text-3xl lg:text-4xl font-black text-caplos-navy tracking-tight leading-tight">
+                  Create, Analyze & Personalize
+                </h2>
+                <p className="text-xl sm:text-2xl lg:text-3xl font-extrabold text-caplos-blue tracking-tight">
+                  Learning Questions
+                </p>
+              </div>
             </div>
 
             <p className="text-base text-caplos-navy-600 leading-relaxed max-w-xl mx-auto lg:mx-0 font-normal">
-              Cukup unggah lembar PDF ujian sekolah Anda. AI Caplos otomatis mengekstrak butir soal, 
-              memotong diagram visual & pilihan gambar, serta menyajikannya ke dalam 11 jenis latihan interaktif ramah anak.
+              Platform cerdas untuk pendidik dan siswa: membuat kuis otomatis dari dokumen PDF, 
+              menganalisis hasil belajar, serta menghadirkan asesmen interaktif yang dipersonalisasi secara menyenangkan.
             </p>
 
             <div className="flex flex-col sm:flex-row items-center justify-center lg:justify-start gap-3.5 pt-2">
