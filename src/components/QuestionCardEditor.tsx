@@ -17,6 +17,7 @@ import {
   Sparkles,
 } from "lucide-react";
 import { ParsedQuestion, QuestionType, ImageSourceType, QuestionOptionItem } from "@/lib/types";
+import { convertQuestionType } from "@/lib/questionConverter";
 import QuestionConversionModal from "@/components/QuestionConversionModal";
 import SmartDistractorModal from "@/components/SmartDistractorModal";
 import ImageAttachmentModal from "@/components/ImageAttachmentModal";
@@ -60,7 +61,10 @@ export default function QuestionCardEditor({
   onDuplicate,
   onDelete,
 }: QuestionCardEditorProps) {
-  const qType: QuestionType = question.question_type || "MULTIPLE_CHOICE";
+  const qType: QuestionType =
+    Array.isArray(question.correct_answers) && question.correct_answers.length > 1
+      ? "MULTIPLE_SELECT"
+      : question.question_type || "MULTIPLE_CHOICE";
   const badgeInfo = TYPE_BADGES[qType] || TYPE_BADGES.MULTIPLE_CHOICE;
   const [isConversionModalOpen, setIsConversionModalOpen] = useState(false);
   const [isDistractorModalOpen, setIsDistractorModalOpen] = useState(false);
@@ -383,9 +387,24 @@ export default function QuestionCardEditor({
           <span className="inline-flex items-center justify-center px-3 py-1 bg-indigo-100 text-indigo-800 rounded-full font-bold text-xs">
             Question #{index + 1}
           </span>
-          <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold border ${badgeInfo.color}`}>
-            {badgeInfo.label}
-          </span>
+          <select
+            value={qType}
+            onChange={(e) => {
+              const target = e.target.value as QuestionType;
+              if (target !== qType) {
+                const converted = convertQuestionType(question, target);
+                onUpdate(converted.convertedQuestion);
+              }
+            }}
+            className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold border ${badgeInfo.color} bg-white cursor-pointer focus:ring-2 focus:ring-indigo-500 focus:outline-hidden shadow-2xs`}
+            title="Pilih atau ubah tipe soal langsung"
+          >
+            {Object.entries(TYPE_BADGES).map(([key, info]) => (
+              <option key={key} value={key}>
+                {info.label}
+              </option>
+            ))}
+          </select>
           {isHighlighted && !isModalMode && (
             <span className="inline-flex items-center gap-1 text-[11px] bg-indigo-600 text-white font-bold px-2.5 py-0.5 rounded-full animate-pulse shadow-xs">
               Focused

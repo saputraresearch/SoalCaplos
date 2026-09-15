@@ -21,6 +21,7 @@ import {
   Sparkles,
 } from "lucide-react";
 import { ParsedQuestion, QuestionType } from "@/lib/types";
+import KidFriendlyQuestionText from "@/components/KidFriendlyQuestionText";
 
 interface QuestionPreviewCardProps {
   question: ParsedQuestion;
@@ -62,7 +63,10 @@ export default function QuestionPreviewCard({
   onDuplicate,
   onDelete,
 }: QuestionPreviewCardProps) {
-  const qType: QuestionType = question.question_type || "MULTIPLE_CHOICE";
+  const qType: QuestionType =
+    Array.isArray(question.correct_answers) && question.correct_answers.length > 1
+      ? "MULTIPLE_SELECT"
+      : question.question_type || "MULTIPLE_CHOICE";
   const config = TYPE_CONFIG[qType] || TYPE_CONFIG.MULTIPLE_CHOICE;
   const TypeIcon = config.icon;
 
@@ -160,13 +164,13 @@ export default function QuestionPreviewCard({
       >
         {/* Question Text */}
         <div>
-          <h3 className="text-base sm:text-lg font-bold text-slate-900 leading-relaxed group-hover/body:text-indigo-950 transition">
-            {question.question_text || (
-              <span className="italic text-slate-400 font-normal">
-                (Teks pertanyaan belum diisi - Klik di sini untuk mengedit)
-              </span>
-            )}
-          </h3>
+          {question.question_text ? (
+            <KidFriendlyQuestionText text={question.question_text} />
+          ) : (
+            <span className="italic text-slate-400 font-normal">
+              (Teks pertanyaan belum diisi - Klik di sini untuk mengedit)
+            </span>
+          )}
         </div>
 
         {/* Question Image if present */}

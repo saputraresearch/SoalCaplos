@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { ParsedQuestion, QuestionType } from "@/lib/types";
 import { logServerError } from "@/lib/serverLogger";
+import { getActiveGeminiModels } from "@/lib/geminiModels";
 import dns from "dns";
 
 // Ensure Node.js resolves IPv4 addresses first to prevent 20s IPv6 timeouts / fetch failed errors
@@ -45,19 +46,13 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const genAI = new GoogleGenerativeAI(apiKey);
-    const userModel = req.headers.get("x-gemini-model");
+    // Ensure Node.js resolves IPv4 first on every request
+    dns.setDefaultResultOrder("ipv4first");
 
-    const candidateModels = [
-      userModel,
-      "gemini-1.5-flash-latest",
-      "gemini-2.0-flash",
-      "gemini-2.5-flash",
-      "gemini-1.5-pro-latest",
-      "gemini-1.5-flash",
-    ].filter(Boolean) as string[];
-
-    const modelsToTry = Array.from(new Set(candidateModels));
+    const genAI = new GoogleGenerativeAI(apiKey.trim());
+    const requestedModel = req.headers.get("x-gemini-model")?.trim();
+    const modelsToTry = await getActiveGeminiModels(apiKey, requestedModel);
+    console.log(`[generate-quiz] Selected models to try:`, modelsToTry);
 
     const selectedTypesText = types && types.length > 0
       ? `Buat soal yang berfokus pada tipe berikut: ${types.join(", ")}.`

@@ -19,6 +19,8 @@ import {
   Key,
   ChevronUp,
   ChevronDown,
+  RotateCcw,
+  Settings,
 } from "lucide-react";
 import { ParsedQuestion, QuestionType } from "@/lib/types";
 import SettingsModal from "@/components/SettingsModal";
@@ -152,7 +154,7 @@ export default function CreateQuizPage() {
     setParseError(null);
 
     const customApiKey = typeof window !== "undefined" ? localStorage.getItem("quizcaplos_gemini_api_key") || "" : "";
-    const customModel = typeof window !== "undefined" ? localStorage.getItem("quizcaplos_gemini_model") || "gemini-1.5-flash-latest" : "gemini-1.5-flash-latest";
+    const customModel = typeof window !== "undefined" ? localStorage.getItem("quizcaplos_gemini_model") || "gemini-3.6-flash" : "gemini-3.6-flash";
 
     const formData = new FormData();
     formData.append("file", file);
@@ -188,7 +190,31 @@ export default function CreateQuizPage() {
       }
 
       setQuizTitle(data.title || file.name.replace(/\.[^/.]+$/, ""));
-      setQuestions(data.questions || []);
+      const extractedQuestions = data.questions || [];
+      setQuestions(extractedQuestions);
+
+      const fillInCount = extractedQuestions.filter((q: any) => q.question_type === "FILL_IN_THE_BLANKS").length;
+      const mcqCount = extractedQuestions.filter((q: any) => !q.question_type || q.question_type === "MULTIPLE_CHOICE").length;
+      const otherCount = extractedQuestions.length - fillInCount - mcqCount;
+      const typeSummary: string[] = [];
+      if (fillInCount > 0) typeSummary.push(`${fillInCount} isian`);
+      if (mcqCount > 0) typeSummary.push(`${mcqCount} pilihan ganda`);
+      if (otherCount > 0) typeSummary.push(`${otherCount} tipe lainnya`);
+
+      const imgCount = extractedQuestions.filter((q: any) => !!q.image_url).length;
+      const optImgCount = extractedQuestions.reduce(
+        (acc: number, q: any) => acc + (q.option_items?.filter((oi: any) => !!oi.image_url).length || 0),
+        0
+      );
+      const imgSummary: string[] = [];
+      if (imgCount > 0) imgSummary.push(`${imgCount} diagram`);
+      if (optImgCount > 0) imgSummary.push(`${optImgCount} gambar opsi`);
+
+      const extraInfo = [typeSummary.join(", "), imgSummary.join(", ")].filter(Boolean).join(" | ");
+      setToastMessage(
+        `✨ Berhasil mengekstrak ${extractedQuestions.length} butir soal${extraInfo ? ` (${extraInfo})` : ""}!`
+      );
+      setTimeout(() => setToastMessage(null), 5000);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Error parsing PDF.";
       setParseError(msg);
@@ -624,19 +650,56 @@ export default function CreateQuizPage() {
           </div>
 
           {parseError && (
-            <div className="p-4 bg-red-50 border border-red-200 rounded-xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-red-700 text-sm">
-              <div className="flex items-center gap-3">
-                <AlertCircle className="w-5 h-5 text-red-500 shrink-0" />
-                <span>{parseError}</span>
+            <div className="p-4 bg-red-50/90 border border-red-200 rounded-2xl space-y-3 text-red-800 text-sm shadow-xs animate-pop">
+              <div className="flex items-start gap-3">
+                <AlertCircle className="w-5 h-5 text-red-600 shrink-0 mt-0.5" />
+                <div className="space-y-1 min-w-0">
+                  <h4 className="font-bold text-red-900 text-sm">Gagal Mengekstrak Soal dari PDF</h4>
+                  <p className="text-xs text-red-700 leading-relaxed break-words">{parseError}</p>
+                </div>
               </div>
-              {parseError.includes("API Key") && (
+
+              <div className="flex flex-wrap items-center gap-2 pt-1 border-t border-red-200/60">
                 <button
+                  type="button"
                   onClick={() => setIsSettingsOpen(true)}
-                  className="px-3.5 py-1.5 rounded-lg bg-red-600 text-white text-xs font-bold shrink-0 hover:bg-red-700 transition"
+                  className="px-3.5 py-1.5 rounded-lg bg-red-600 hover:bg-red-700 text-white text-xs font-bold transition flex items-center gap-1.5 shadow-xs"
                 >
-                  Enter API Key
+                  <Settings className="w-3.5 h-3.5" />
+                  <span>Pengaturan API Key & Model</span>
                 </button>
-              )}
+
+                {file && (
+                  <button
+                    type="button"
+                    onClick={handleParsePDF}
+                    disabled={isParsing}
+                    className="px-3.5 py-1.5 rounded-lg bg-white border border-red-300 hover:bg-red-100 text-red-800 text-xs font-bold transition flex items-center gap-1.5 shadow-xs disabled:opacity-50"
+                  >
+                    <RotateCcw className="w-3.5 h-3.5" />
+                    <span>Coba Ekstrak Ulang</span>
+                  </button>
+                )}
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setParseError(null);
+                    setQuestions([
+                      {
+                        question_text: "",
+                        question_type: "MULTIPLE_CHOICE",
+                        options: ["", "", "", ""],
+                        correct_answer_index: 0,
+                        explanation: "",
+                      },
+                    ]);
+                  }}
+                  className="px-3.5 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold transition"
+                >
+                  Tulis Soal Secara Manual
+                </button>
+              </div>
             </div>
           )}
 

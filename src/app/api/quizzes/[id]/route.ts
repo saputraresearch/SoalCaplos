@@ -5,9 +5,10 @@ import {
   findLocalQuizById,
   findLocalQuizBySlug,
   updateLocalQuiz,
+  updateLocalQuizStatus,
   deleteLocalQuiz,
 } from "@/lib/localStorageData";
-import { ParsedQuestion } from "@/lib/types";
+import { ParsedQuestion, QuestionType } from "@/lib/types";
 
 // GET /api/quizzes/[id] - Fetch single quiz with questions by ID or Slug
 export async function GET(
@@ -122,14 +123,20 @@ export async function PUT(
           // Replace questions: delete old, insert new
           await supabaseAdmin.from("questions").delete().eq("quiz_id", id);
 
-          const questionsToInsert = questions.map((q, idx) => ({
-            quiz_id: id,
-            question_text: q.question_text || `Question ${idx + 1}`,
-            question_type: q.question_type || "MULTIPLE_CHOICE",
-            image_url: q.image_url || null,
-            options: q.options || [],
-            correct_answer_index: q.correct_answer_index ?? 0,
-            correct_answers: q.correct_answers || [q.correct_answer_index ?? 0],
+          const questionsToInsert = questions.map((q, idx) => {
+            const isMulti = Array.isArray(q.correct_answers) && q.correct_answers.length > 1;
+            const effectiveType: QuestionType = isMulti ? "MULTIPLE_SELECT" : (q.question_type || "MULTIPLE_CHOICE");
+            return {
+              quiz_id: id,
+              question_text: q.question_text || `Question ${idx + 1}`,
+              question_type: effectiveType,
+              image_url: q.image_url || null,
+              image_source_type: q.image_source_type || "NONE",
+              alt_text: q.alt_text || null,
+              options: q.options || [],
+              option_items: q.option_items || [],
+              correct_answer_index: q.correct_answer_index ?? 0,
+              correct_answers: q.correct_answers || [q.correct_answer_index ?? 0],
             matching_pairs: q.matching_pairs || [],
             reorder_items: q.reorder_items || [],
             correct_order: q.correct_order || [],
@@ -143,7 +150,8 @@ export async function PUT(
             categorize_items: q.categorize_items || [],
             explanation: q.explanation || null,
             order_index: idx,
-          }));
+          };
+        });
 
           await supabaseAdmin.from("questions").insert(questionsToInsert);
           updatedInSupabase = true;
@@ -195,6 +203,51 @@ export async function DELETE(
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : String(err);
     logServerError(`/api/quizzes/${params.id} DELETE`, msg, err);
+    return NextResponse.json({ error: msg }, { status: 500 });
+  }
+}
+
+// PATCH /api/quizzes/[id] - Quickly toggle status (draft <-> published)
+export async function PATCH(
+  req: NextRequest,
+  { params }: { params: { id: string } }
+) {
+  try {
+    const { id } = params;
+    const body = await req.json();
+    const { status } = body as { status?: "draft" | "published" };
+
+    if (!status || !["draft", "published"].includes(status)) {
+      return NextResponse.json({ error: "Status must be 'draft' or 'published'" }, { status: 400 });
+    }
+
+    const isSupabaseConfigured =
+      process.env.NEXT_PUBLIC_SUPABASE_URL &&
+      !process.env.NEXT_PUBLIC_SUPABASE_URL.includes("your-supabase-project");
+
+    if (isSupabaseConfigured) {
+      try {
+        await supabaseAdmin
+          .from("quizzes")
+          .update({ status })
+          .or(`id.eq.${id},slug.eq.${id}`);
+      } catch (err) {
+        console.warn("Supabase patch status error:", err);
+      }
+    }
+
+    const updated = updateLocalQuizStatus(id, status);
+    if (!updated) {
+      return NextResponse.json({ error: "Quiz not found" }, { status: 404 });
+    }
+
+    return NextResponse.json({
+      success: true,
+      quiz: updated.quiz,
+    });
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
+    logServerError(`/api/quizzes/${params.id} PATCH`, msg, err);
     return NextResponse.json({ error: msg }, { status: 500 });
   }
 }

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase";
-import { ParsedQuestion, Quiz, Question } from "@/lib/types";
+import { ParsedQuestion, Quiz, Question, QuestionType } from "@/lib/types";
 import { logServerError } from "@/lib/serverLogger";
 import { saveLocalQuiz, getLocalQuizzes } from "@/lib/localStorageData";
 
@@ -80,15 +80,21 @@ export async function POST(req: NextRequest) {
       status: status || "published",
     };
 
-    const formattedQuestions: Question[] = questions.map((q, idx) => ({
-      id: `q_${Date.now()}_${idx}`,
-      quiz_id: quizId,
-      question_text: q.question_text || `Question ${idx + 1}`,
-      question_type: q.question_type || "MULTIPLE_CHOICE",
-      image_url: q.image_url || null,
-      options: q.options || [],
-      correct_answer_index: q.correct_answer_index ?? 0,
-      correct_answers: q.correct_answers || [q.correct_answer_index ?? 0],
+    const formattedQuestions: Question[] = questions.map((q, idx) => {
+      const isMulti = Array.isArray(q.correct_answers) && q.correct_answers.length > 1;
+      const effectiveType: QuestionType = isMulti ? "MULTIPLE_SELECT" : (q.question_type || "MULTIPLE_CHOICE");
+      return {
+        id: `q_${Date.now()}_${idx}`,
+        quiz_id: quizId,
+        question_text: q.question_text || `Question ${idx + 1}`,
+        question_type: effectiveType,
+        image_url: q.image_url || null,
+        image_source_type: q.image_source_type || (q.image_url ? "PASTE_UPLOAD" : "NONE"),
+        alt_text: q.alt_text || null,
+        options: q.options || [],
+        option_items: q.option_items || [],
+        correct_answer_index: q.correct_answer_index ?? 0,
+        correct_answers: q.correct_answers || [q.correct_answer_index ?? 0],
       matching_pairs: q.matching_pairs || [],
       reorder_items: q.reorder_items || [],
       correct_order: q.correct_order || [],
@@ -102,7 +108,8 @@ export async function POST(req: NextRequest) {
       categorize_items: q.categorize_items || [],
       explanation: q.explanation || null,
       order_index: idx,
-    }));
+    };
+  });
 
     const isSupabaseConfigured =
       process.env.NEXT_PUBLIC_SUPABASE_URL &&
@@ -117,21 +124,38 @@ export async function POST(req: NextRequest) {
           .insert({
             title: title.trim(),
             slug,
+            status: status || "published",
           })
-          .select("id, title, slug, created_at")
+          .select("id, title, slug, created_at, status")
           .single();
 
         if (!quizError && quizData) {
           quizRecord.id = quizData.id;
           quizRecord.created_at = quizData.created_at;
+          quizRecord.status = quizData.status || status || "published";
 
-          const questionsToInsert = questions.map((q, idx) => ({
+          const questionsToInsert = formattedQuestions.map((q, idx) => ({
             quiz_id: quizData.id,
             question_text: q.question_text || `Question ${idx + 1}`,
             question_type: q.question_type || "MULTIPLE_CHOICE",
             image_url: q.image_url || null,
+            image_source_type: q.image_source_type || "NONE",
+            alt_text: q.alt_text || null,
             options: q.options || [],
+            option_items: q.option_items || [],
             correct_answer_index: q.correct_answer_index ?? 0,
+            correct_answers: q.correct_answers || [q.correct_answer_index ?? 0],
+            matching_pairs: q.matching_pairs || [],
+            reorder_items: q.reorder_items || [],
+            correct_order: q.correct_order || [],
+            blanks_keywords: q.blanks_keywords || [],
+            rubric: q.rubric || [],
+            math_solution: q.math_solution || null,
+            image_context: q.image_context || null,
+            label_targets: q.label_targets || [],
+            hotspot_zone: q.hotspot_zone || null,
+            categories: q.categories || [],
+            categorize_items: q.categorize_items || [],
             explanation: q.explanation || null,
             order_index: idx,
           }));

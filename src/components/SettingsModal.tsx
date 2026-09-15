@@ -9,22 +9,33 @@ interface SettingsModalProps {
 }
 
 const AVAILABLE_MODELS = [
-  { id: "gemini-1.5-flash-latest", label: "Gemini 1.5 Flash (Latest - Recommended)" },
-  { id: "gemini-2.0-flash", label: "Gemini 2.0 Flash (Fast)" },
-  { id: "gemini-1.5-pro-latest", label: "Gemini 1.5 Pro (High Accuracy)" },
-  { id: "gemini-1.5-flash", label: "Gemini 1.5 Flash (Standard)" },
-  { id: "gemini-2.0-flash-exp", label: "Gemini 2.0 Flash Experimental" },
+  { id: "gemini-3.6-flash", label: "Gemini 3.6 Flash (Terbaru & Sangat Direkomendasikan)" },
+  { id: "gemini-2.5-flash", label: "Gemini 2.5 Flash (Generasi Baru - Cepat & Andal)" },
+  { id: "gemini-2.5-pro", label: "Gemini 2.5 Pro (Akurasi Tinggi - Soal Kompleks)" },
+  { id: "gemini-2.0-flash", label: "Gemini 2.0 Flash" },
+  { id: "gemini-1.5-flash-latest", label: "Gemini 1.5 Flash" },
 ];
 
 export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
   const [apiKey, setApiKey] = useState("");
-  const [model, setModel] = useState("gemini-1.5-flash-latest");
+  const [model, setModel] = useState("gemini-3.6-flash");
   const [saved, setSaved] = useState(false);
 
   useEffect(() => {
     if (typeof window !== "undefined") {
       const storedKey = localStorage.getItem("quizcaplos_gemini_api_key") || "";
-      const storedModel = localStorage.getItem("quizcaplos_gemini_model") || "gemini-1.5-flash-latest";
+      let storedModel = localStorage.getItem("quizcaplos_gemini_model") || "gemini-3.6-flash";
+      if (
+        storedModel === "gemini-2.0-flash-exp" ||
+        storedModel === "gemini-1.5-flash-latest" ||
+        storedModel === "gemini-1.5-flash" ||
+        storedModel === "gemini-1.5-pro" ||
+        storedModel === "gemini-1.5-pro-latest" ||
+        storedModel === "gemini-2.0-flash"
+      ) {
+        storedModel = "gemini-3.6-flash";
+        localStorage.setItem("quizcaplos_gemini_model", "gemini-3.6-flash");
+      }
       setApiKey(storedKey);
       setModel(storedModel);
     }

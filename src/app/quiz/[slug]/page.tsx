@@ -27,7 +27,121 @@ import {
   Target,
   Layers,
   Tag,
+  GripVertical,
+  ArrowUpDown,
 } from "lucide-react";
+import KidFriendlyQuestionText from "@/components/KidFriendlyQuestionText";
+
+interface BlankPart {
+  type: "text" | "blank";
+  content: string;
+  blankIndex?: number;
+}
+
+function parseBlanksFromText(text: string): { blankCount: number; parts: BlankPart[] } {
+  if (!text) {
+    return { blankCount: 1, parts: [{ type: "blank", content: "[___]", blankIndex: 0 }] };
+  }
+  const regex = /\[(?:_{2,}|\.{2,}|\s*_{2,}\s*|\s*\.{2,}\s*)\]|_{3,}/g;
+  const parts: BlankPart[] = [];
+  let lastIndex = 0;
+  let match: RegExpExecArray | null;
+  let blankCount = 0;
+
+  while ((match = regex.exec(text)) !== null) {
+    if (match.index > lastIndex) {
+      parts.push({ type: "text", content: text.substring(lastIndex, match.index) });
+    }
+    parts.push({ type: "blank", content: match[0], blankIndex: blankCount });
+    blankCount++;
+    lastIndex = regex.lastIndex;
+  }
+
+  if (lastIndex < text.length) {
+    parts.push({ type: "text", content: text.substring(lastIndex) });
+  }
+
+  if (blankCount === 0) {
+    return {
+      blankCount: 1,
+      parts: [
+        { type: "text", content: text },
+        { type: "blank", content: " [___]", blankIndex: 0 },
+      ],
+    };
+  }
+
+  return { blankCount, parts };
+}
+
+function getExpectedKeywordsForBlank(q: Question, blankIndex: number, totalBlanks: number): string[] {
+  const rawKeywords = q.blanks_keywords || [];
+
+  // Case 1: Pipe delimiter e.g. ["karbondioksida, co2 | oksigen, o2"]
+  if (rawKeywords.length === 1 && rawKeywords[0].includes("|")) {
+    const segments = rawKeywords[0].split("|").map((s) => s.trim());
+    if (segments[blankIndex]) {
+      return segments[blankIndex]
+        .split(",")
+        .map((k) => k.trim())
+        .filter(Boolean);
+    }
+  }
+
+  // Case 2: Array has at least totalBlanks entries e.g. ["karbondioksida, co2", "oksigen, o2"]
+  if (rawKeywords.length >= totalBlanks && totalBlanks > 1) {
+    const entry = rawKeywords[blankIndex] || "";
+    return entry
+      .split(",")
+      .map((k) => k.trim())
+      .filter(Boolean);
+  }
+
+  // Case 3: Single comma-separated string with totalBlanks > 1 e.g. ["karbondioksida, oksigen"]
+  if (rawKeywords.length === 1 && rawKeywords[0].includes(",") && totalBlanks > 1) {
+    const parts = rawKeywords[0].split(",").map((k) => k.trim()).filter(Boolean);
+    if (parts[blankIndex]) {
+      return [parts[blankIndex]];
+    }
+  }
+
+  // Case 4: q.options has items matching blanks count
+  if (q.options && q.options.length >= totalBlanks && totalBlanks > 1) {
+    const opt = q.options[blankIndex];
+    if (opt) return [opt.trim()];
+  }
+
+  // Case 5: Single blank
+  if (totalBlanks <= 1) {
+    const list: string[] = [];
+    rawKeywords.forEach((k) => {
+      k.split(",").forEach((sub) => {
+        const t = sub.trim();
+        if (t) list.push(t);
+      });
+    });
+    if (
+      q.options &&
+      typeof q.correct_answer_index === "number" &&
+      q.options[q.correct_answer_index]
+    ) {
+      list.push(q.options[q.correct_answer_index].trim());
+    }
+    return list.length > 0 ? list : [];
+  }
+
+  return rawKeywords[blankIndex] ? [rawKeywords[blankIndex].trim()] : [];
+}
+
+const STEP_COLORS = [
+  { bg: "bg-sky-500", text: "text-white", border: "border-sky-300", light: "bg-sky-50", badge: "bg-sky-100 text-sky-800" },
+  { bg: "bg-emerald-500", text: "text-white", border: "border-emerald-300", light: "bg-emerald-50", badge: "bg-emerald-100 text-emerald-800" },
+  { bg: "bg-amber-500", text: "text-white", border: "border-amber-300", light: "bg-amber-50", badge: "bg-amber-100 text-amber-800" },
+  { bg: "bg-purple-500", text: "text-white", border: "border-purple-300", light: "bg-purple-50", badge: "bg-purple-100 text-purple-800" },
+  { bg: "bg-rose-500", text: "text-white", border: "border-rose-300", light: "bg-rose-50", badge: "bg-rose-100 text-rose-800" },
+  { bg: "bg-indigo-500", text: "text-white", border: "border-indigo-300", light: "bg-indigo-50", badge: "bg-indigo-100 text-indigo-800" },
+  { bg: "bg-teal-500", text: "text-white", border: "border-teal-300", light: "bg-teal-50", badge: "bg-teal-100 text-teal-800" },
+];
 
 const DEMO_QUIZ: Quiz = {
   id: "demo-quiz-id",
@@ -91,21 +205,149 @@ export default function StudentQuizPage() {
   const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
   const [selectedMultiIndices, setSelectedMultiIndices] = useState<number[]>([]);
   const [userMatches, setUserMatches] = useState<Record<string, string>>({});
+  const [shuffledMatchingOptions, setShuffledMatchingOptions] = useState<string[]>([]);
+  const [selectedMatchingChip, setSelectedMatchingChip] = useState<string | null>(null);
+  const [draggedMatchingChip, setDraggedMatchingChip] = useState<string | null>(null);
   const [userOrder, setUserOrder] = useState<string[]>([]);
+  const [selectedReorderIndex, setSelectedReorderIndex] = useState<number | null>(null);
+  const [draggedReorderIndex, setDraggedReorderIndex] = useState<number | null>(null);
   const [userText, setUserText] = useState<string>("");
+  const [userMultiBlanks, setUserMultiBlanks] = useState<Record<number, string>>({});
+  const [multiBlankResults, setMultiBlankResults] = useState<{ isCorrect: boolean; key: string }[]>([]);
   const [userLabelMatches, setUserLabelMatches] = useState<Record<string, string>>({});
+  const [shuffledLabelChips, setShuffledLabelChips] = useState<string[]>([]);
   const [selectedLabelChip, setSelectedLabelChip] = useState<string | null>(null);
   const [userHotspotCoords, setUserHotspotCoords] = useState<{ x: number; y: number } | null>(null);
   const [userCategorization, setUserCategorization] = useState<Record<string, string[]>>({});
+  const [shuffledCategorizeItems, setShuffledCategorizeItems] = useState<{ text: string; category: string }[]>([]);
   const [selectedCategoryItem, setSelectedCategoryItem] = useState<string | null>(null);
   const [isAnswered, setIsAnswered] = useState(false);
   const [lastIsCorrect, setLastIsCorrect] = useState(false);
   const [score, setScore] = useState(0);
   const [answersList, setAnswersList] = useState<StudentAnswer[]>([]);
 
-  // Completion state
   const [isCompleted, setIsCompleted] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isPublishingFromRunner, setIsPublishingFromRunner] = useState(false);
+
+  const handlePublishNow = async () => {
+    if (!quiz?.id || isDemo) return;
+    setIsPublishingFromRunner(true);
+    try {
+      const res = await fetch(`/api/quizzes/${quiz.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: "published" }),
+      });
+      if (res.ok) {
+        setQuiz((prev) => (prev ? { ...prev, status: "published" } : null));
+      }
+    } catch (err) {
+      console.error("Error publishing quiz:", err);
+    } finally {
+      setIsPublishingFromRunner(false);
+    }
+  };
+
+  // Helper to accurately identify question type
+  const getQuestionType = (q: Question): QuestionType => {
+    if (!q) return "MULTIPLE_CHOICE";
+
+    // 1. If question has multiple correct answers, it is ALWAYS MULTIPLE_SELECT
+    if (Array.isArray(q.correct_answers) && q.correct_answers.length > 1) {
+      return "MULTIPLE_SELECT";
+    }
+
+    // 2. High-priority structural data checks (if question has specialized data fields, respect them)
+    if (Array.isArray(q.reorder_items) && q.reorder_items.length > 0) {
+      return "REORDER";
+    }
+    if (Array.isArray(q.matching_pairs) && q.matching_pairs.length > 0) {
+      return "MATCHING";
+    }
+    if (Array.isArray(q.label_targets) && q.label_targets.length > 0) {
+      return "IMAGE_LABELING";
+    }
+    if (q.hotspot_zone && typeof q.hotspot_zone.x === "number") {
+      return "IMAGE_HOTSPOT";
+    }
+    if (Array.isArray(q.categorize_items) && q.categorize_items.length > 0) {
+      return "CATEGORIZE_ITEMS";
+    }
+
+    // 3. Normalized check for question_type string
+    const rawType = q.question_type
+      ? String(q.question_type).trim().toUpperCase().replace(/[-\s]/g, "_")
+      : "";
+
+    if (
+      rawType === "MULTIPLE_SELECT" ||
+      rawType === "MULTIPLESELECT" ||
+      rawType === "MULTI_SELECT" ||
+      rawType === "PILIHAN_GANDA_KOMPLEKS" ||
+      rawType === "CHECKBOX"
+    ) {
+      return "MULTIPLE_SELECT";
+    }
+
+    if (rawType === "TRUE_OR_FALSE" || rawType === "BENAR_SALAH" || rawType === "BOOLEAN") {
+      return "TRUE_OR_FALSE";
+    }
+    if (rawType === "MATCHING" || rawType === "MENJODOHKAN") {
+      return "MATCHING";
+    }
+    if (rawType === "REORDER" || rawType === "URUTAN") {
+      return "REORDER";
+    }
+    if (rawType === "FILL_IN_THE_BLANKS" || rawType === "ISIAN_SINGKAT" || rawType === "ISIAN_RUMPANG") {
+      return "FILL_IN_THE_BLANKS";
+    }
+    if (rawType === "OPEN_ENDED" || rawType === "ESAI" || rawType === "URAIAN") {
+      return "OPEN_ENDED";
+    }
+    if (rawType === "MATH_RESPONSE" || rawType === "MATEMATIKA" || rawType === "STEM") {
+      return "MATH_RESPONSE";
+    }
+    if (rawType === "IMAGE_LABELING") {
+      return "IMAGE_LABELING";
+    }
+    if (rawType === "IMAGE_HOTSPOT") {
+      return "IMAGE_HOTSPOT";
+    }
+    if (rawType === "CATEGORIZE_ITEMS" || rawType === "PENGELOMPOKAN") {
+      return "CATEGORIZE_ITEMS";
+    }
+
+    // 4. Question text heuristics (e.g. prompt keywords)
+    if (
+      q.question_text &&
+      /^(urutkan|susunlah|urutan\s+tahapan|urutan\s+langkah|tahapan\s+berikut)/i.test(q.question_text.trim())
+    ) {
+      return "REORDER";
+    }
+
+    if (
+      q.question_text &&
+      /\[___\]/.test(q.question_text) &&
+      (!q.options || q.options.length <= 1)
+    ) {
+      return "FILL_IN_THE_BLANKS";
+    }
+
+    if (
+      q.question_text &&
+      /(pilih\s+(semua|2|3|4|dua|tiga|empat)|pilihan\s+ganda\s+kompleks|lebih\s+dari\s+satu\s+jawaban)/i.test(q.question_text) &&
+      (q.options && q.options.length >= 3)
+    ) {
+      return "MULTIPLE_SELECT";
+    }
+
+    if (q.options?.length === 2 && (q.options[0] === "Benar" || q.options[0] === "True")) {
+      return "TRUE_OR_FALSE";
+    }
+
+    return "MULTIPLE_CHOICE";
+  };
 
   // Fetch Quiz & Questions on mount
   useEffect(() => {
@@ -143,49 +385,127 @@ export default function StudentQuizPage() {
     fetchQuizData();
   }, [slug]);
 
-  // Reset answer states when currentIndex or questions change
+  // Reset answer states and initialize randomized presentation when question changes
   useEffect(() => {
     setSelectedIndex(null);
     setSelectedMultiIndices([]);
     setUserMatches({});
+    setSelectedMatchingChip(null);
+    setDraggedMatchingChip(null);
     setUserText("");
     setUserLabelMatches({});
     setSelectedLabelChip(null);
     setUserHotspotCoords(null);
     setSelectedCategoryItem(null);
+    setSelectedReorderIndex(null);
+    setDraggedReorderIndex(null);
+    setUserMultiBlanks({});
+    setMultiBlankResults([]);
     setIsAnswered(false);
     setLastIsCorrect(false);
 
     const q = questions[currentIndex];
     if (q) {
-      if (q.question_type === "REORDER" && q.reorder_items && q.reorder_items.length > 0) {
-        setUserOrder([...q.reorder_items]);
+      const qType = getQuestionType(q);
+
+      // 1. REORDER: Scramble items so student must actively sort them
+      if (qType === "REORDER" && q.reorder_items && q.reorder_items.length > 0) {
+        const originalItems = [...q.reorder_items];
+        const correctOrder = q.correct_order || [];
+
+        let expectedItems = [...originalItems];
+        if (correctOrder.length === originalItems.length && originalItems.length > 0) {
+          expectedItems = [...originalItems]
+            .map((item, i) => ({ item, order: correctOrder[i] || i + 1 }))
+            .sort((a, b) => a.order - b.order)
+            .map((x) => x.item);
+        }
+
+        // Fisher-Yates Shuffle
+        const shuffled = [...originalItems];
+        for (let i = shuffled.length - 1; i > 0; i--) {
+          const j = Math.floor(Math.random() * (i + 1));
+          [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+        }
+
+        // Guarantee that if length > 1, the initial state is NOT the already solved state
+        if (shuffled.length > 1 && shuffled.every((val, i) => val === expectedItems[i])) {
+          [shuffled[0], shuffled[1]] = [shuffled[1], shuffled[0]];
+        }
+
+        setUserOrder(shuffled);
+      } else {
+        setUserOrder([]);
       }
-      if (q.question_type === "CATEGORIZE_ITEMS" && q.categories) {
-        const initCats: Record<string, string[]> = {};
-        q.categories.forEach((c) => {
-          initCats[c] = [];
-        });
-        setUserCategorization(initCats);
+
+      // 2. MATCHING: Scramble right-hand options so choices are not displayed in parallel solved order
+      if (qType === "MATCHING" && q.matching_pairs && q.matching_pairs.length > 0) {
+        const rightOpts = q.matching_pairs.map((p) => p.right);
+        const shuffled = [...rightOpts];
+        for (let i = shuffled.length - 1; i > 0; i--) {
+          const j = Math.floor(Math.random() * (i + 1));
+          [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+        }
+        // If identical to original and length > 1, swap first two
+        if (shuffled.length > 1 && shuffled.every((val, i) => val === rightOpts[i])) {
+          [shuffled[0], shuffled[1]] = [shuffled[1], shuffled[0]];
+        }
+        setShuffledMatchingOptions(shuffled);
+      } else {
+        setShuffledMatchingOptions([]);
+      }
+
+      // 3. IMAGE_LABELING: Scramble label chips pool
+      if (qType === "IMAGE_LABELING" && q.label_targets && q.label_targets.length > 0) {
+        const labels = q.label_targets.map((t) => t.label);
+        const shuffled = [...labels];
+        for (let i = shuffled.length - 1; i > 0; i--) {
+          const j = Math.floor(Math.random() * (i + 1));
+          [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+        }
+        setShuffledLabelChips(shuffled);
+      } else {
+        setShuffledLabelChips([]);
+      }
+
+      // 4. CATEGORIZE_ITEMS: Initialize category buckets and scramble unassigned item pool
+      if (qType === "CATEGORIZE_ITEMS") {
+        if (q.categories) {
+          const initCats: Record<string, string[]> = {};
+          q.categories.forEach((c) => {
+            initCats[c] = [];
+          });
+          setUserCategorization(initCats);
+        }
+        if (q.categorize_items && q.categorize_items.length > 0) {
+          const items = [...q.categorize_items];
+          for (let i = items.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [items[i], items[j]] = [items[j], items[i]];
+          }
+          setShuffledCategorizeItems(items);
+        } else {
+          setShuffledCategorizeItems([]);
+        }
       }
     }
   }, [currentIndex, questions]);
 
   const currentQ = questions[currentIndex];
-
-  const getQuestionType = (q: Question): QuestionType => {
-    if (q.question_type) return q.question_type;
-    if (q.options?.length === 2 && (q.options[0] === "Benar" || q.options[0] === "True")) {
-      return "TRUE_OR_FALSE";
-    }
-    return "MULTIPLE_CHOICE";
-  };
-
   const currentType = currentQ ? getQuestionType(currentQ) : "MULTIPLE_CHOICE";
 
   // 1. Single Option Select (MULTIPLE_CHOICE)
   const handleSelectOption = (oIndex: number) => {
     if (isAnswered) return;
+
+    // Critical Safeguard: If this question is MULTIPLE_SELECT or has multiple answers, route to toggleMultiSelect
+    if (
+      currentType === "MULTIPLE_SELECT" ||
+      (Array.isArray(currentQ.correct_answers) && currentQ.correct_answers.length > 1)
+    ) {
+      toggleMultiSelect(oIndex);
+      return;
+    }
 
     const isCorrect = oIndex === currentQ.correct_answer_index;
     setSelectedIndex(oIndex);
@@ -216,7 +536,17 @@ export default function StudentQuizPage() {
   const handleSelectTrueFalse = (oIndex: number) => {
     if (isAnswered) return;
 
-    const isCorrect = oIndex === currentQ.correct_answer_index;
+    let expectedIdx = currentQ.correct_answer_index ?? 0;
+    if (currentQ.options && currentQ.options.length === 2) {
+      const optText = currentQ.options[expectedIdx]?.toLowerCase() || "";
+      if (optText.includes("salah") || optText.includes("false")) {
+        expectedIdx = 1;
+      } else if (optText.includes("benar") || optText.includes("true")) {
+        expectedIdx = 0;
+      }
+    }
+
+    const isCorrect = oIndex === expectedIdx;
     setSelectedIndex(oIndex);
     setIsAnswered(true);
     setLastIsCorrect(isCorrect);
@@ -235,7 +565,7 @@ export default function StudentQuizPage() {
         question_text: currentQ.question_text,
         question_type: "TRUE_OR_FALSE",
         selected_index: oIndex,
-        correct_index: currentQ.correct_answer_index,
+        correct_index: expectedIdx,
         is_correct: isCorrect,
       },
     ]);
@@ -286,10 +616,31 @@ export default function StudentQuizPage() {
     ]);
   };
 
-  // 4. Matching Pairing & Submit
+  // 4. Matching Pairing & Submit (Strict 1-to-1 unique match rule)
   const handleSetPairMatch = (leftItem: string, rightItem: string) => {
     if (isAnswered) return;
-    setUserMatches((prev) => ({ ...prev, [leftItem]: rightItem }));
+    setUserMatches((prev) => {
+      const next = { ...prev };
+      // Strict 1-to-1: if rightItem was already paired with another left item, remove it
+      Object.keys(next).forEach((k) => {
+        if (next[k] === rightItem) {
+          delete next[k];
+        }
+      });
+      next[leftItem] = rightItem;
+      return next;
+    });
+    setSelectedMatchingChip(null);
+    setDraggedMatchingChip(null);
+  };
+
+  const handleUnassignPairMatch = (leftItem: string) => {
+    if (isAnswered) return;
+    setUserMatches((prev) => {
+      const next = { ...prev };
+      delete next[leftItem];
+      return next;
+    });
   };
 
   const handleSubmitMatching = () => {
@@ -327,7 +678,7 @@ export default function StudentQuizPage() {
     ]);
   };
 
-  // 5. Reorder Steps & Submit
+  // 5. Reorder Steps & Submit (Tap-to-Swap, Drag-and-Drop, Button Shifting)
   const moveOrderItem = (index: number, direction: "up" | "down") => {
     if (isAnswered) return;
     const newIdx = direction === "up" ? index - 1 : index + 1;
@@ -338,18 +689,64 @@ export default function StudentQuizPage() {
     setUserOrder(updated);
   };
 
+  const handleTapReorderItem = (idx: number) => {
+    if (isAnswered) return;
+    if (selectedReorderIndex === null) {
+      setSelectedReorderIndex(idx);
+    } else if (selectedReorderIndex === idx) {
+      setSelectedReorderIndex(null);
+    } else {
+      // Swap the two items directly
+      const next = [...userOrder];
+      const temp = next[selectedReorderIndex];
+      next[selectedReorderIndex] = next[idx];
+      next[idx] = temp;
+      setUserOrder(next);
+      setSelectedReorderIndex(null);
+      playSound("correct");
+    }
+  };
+
+  const handleDragStartReorder = (e: React.DragEvent, idx: number) => {
+    if (isAnswered) return;
+    setDraggedReorderIndex(idx);
+    e.dataTransfer.setData("text/plain", String(idx));
+    e.dataTransfer.effectAllowed = "move";
+  };
+
+  const handleDragOverReorder = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "move";
+  };
+
+  const handleDropReorder = (e: React.DragEvent, targetIdx: number) => {
+    e.preventDefault();
+    if (isAnswered) return;
+    const sourceIdx = draggedReorderIndex ?? parseInt(e.dataTransfer.getData("text/plain"), 10);
+    if (!isNaN(sourceIdx) && sourceIdx !== targetIdx && sourceIdx >= 0 && sourceIdx < userOrder.length) {
+      const next = [...userOrder];
+      const [moved] = next.splice(sourceIdx, 1);
+      next.splice(targetIdx, 0, moved);
+      setUserOrder(next);
+      playSound("correct");
+    }
+    setDraggedReorderIndex(null);
+  };
+
   const handleSubmitReorder = () => {
     if (isAnswered) return;
     const originalItems = currentQ.reorder_items || [];
     const correctOrder = currentQ.correct_order || [];
 
     let isCorrect = true;
-    if (correctOrder.length === originalItems.length && originalItems.length > 0) {
-      // Build expected array in order
-      const expectedItems = [...originalItems]
-        .map((item, i) => ({ item, order: correctOrder[i] || i + 1 }))
-        .sort((a, b) => a.order - b.order)
-        .map((x) => x.item);
+    if (originalItems.length > 0) {
+      let expectedItems = [...originalItems];
+      if (correctOrder.length === originalItems.length) {
+        expectedItems = [...originalItems]
+          .map((item, i) => ({ item, order: correctOrder[i] || i + 1 }))
+          .sort((a, b) => a.order - b.order)
+          .map((x) => x.item);
+      }
 
       isCorrect = expectedItems.every((val, i) => val === userOrder[i]);
     }
@@ -376,27 +773,57 @@ export default function StudentQuizPage() {
     ]);
   };
 
-  // 6. Fill In The Blanks Submit
+  // 6. Fill In The Blanks Submit (Multi-Blank & Single-Blank Support)
   const handleSubmitFillIn = () => {
-    if (isAnswered || !userText.trim()) return;
+    if (isAnswered) return;
 
-    const keywords = currentQ.blanks_keywords || [];
-    const cleanUser = userText.trim().toLowerCase();
+    const { blankCount } = parseBlanksFromText(currentQ.question_text);
 
-    // Match against any keyword or option
-    const isCorrect =
-      keywords.some((kw) => kw.trim().toLowerCase() === cleanUser) ||
-      (currentQ.options && currentQ.options.some((opt) => opt.trim().toLowerCase() === cleanUser));
+    // Validate that all blanks have at least some input
+    const allFilled = Array.from({ length: blankCount }).every((_, i) => {
+      const val = blankCount === 1 ? (userMultiBlanks[0] ?? userText) : (userMultiBlanks[i] ?? "");
+      return val.trim().length > 0;
+    });
+    if (!allFilled) return;
 
+    const results: { isCorrect: boolean; key: string }[] = [];
+    let allCorrect = true;
+
+    for (let i = 0; i < blankCount; i++) {
+      const userVal = (blankCount === 1 ? (userMultiBlanks[0] ?? userText) : (userMultiBlanks[i] ?? ""))
+        .trim()
+        .toLowerCase()
+        .replace(/[.,!?;:]+$/, "");
+      const expectedKeywords = getExpectedKeywordsForBlank(currentQ, i, blankCount);
+
+      const isMatch = expectedKeywords.some((kw) => {
+        return kw.trim().toLowerCase().replace(/[.,!?;:]+$/, "") === userVal;
+      });
+
+      if (!isMatch) allCorrect = false;
+      results.push({
+        isCorrect: isMatch,
+        key: expectedKeywords.join(" / ") || (currentQ.options?.[i] || "Sesuai materi"),
+      });
+    }
+
+    setMultiBlankResults(results);
     setIsAnswered(true);
-    setLastIsCorrect(isCorrect);
+    setLastIsCorrect(allCorrect);
 
-    if (isCorrect) {
+    if (allCorrect) {
       playSound("correct");
       setScore((prev) => prev + 1);
     } else {
       playSound("wrong");
     }
+
+    const formattedAnswer =
+      blankCount > 1
+        ? Object.entries(userMultiBlanks)
+            .map(([idx, val]) => `Isian (${Number(idx) + 1}): ${val.trim()}`)
+            .join(" | ")
+        : (userMultiBlanks[0] ?? userText).trim();
 
     setAnswersList((prev) => [
       ...prev,
@@ -404,8 +831,8 @@ export default function StudentQuizPage() {
         question_id: currentQ.id,
         question_text: currentQ.question_text,
         question_type: "FILL_IN_THE_BLANKS",
-        user_text: userText.trim(),
-        is_correct: isCorrect,
+        user_text: formattedAnswer,
+        is_correct: allCorrect,
       },
     ]);
   };
@@ -436,14 +863,29 @@ export default function StudentQuizPage() {
   const handleSubmitMath = () => {
     if (isAnswered || !userText.trim()) return;
 
-    const expected = currentQ.options[currentQ.correct_answer_index] || currentQ.math_solution || "";
-    const cleanUser = userText.trim().replace(/\s+/g, "").toLowerCase();
-    const cleanExpected = expected.replace(/\s+/g, "").toLowerCase();
+    const rawExpected =
+      (currentQ.options && typeof currentQ.correct_answer_index === "number"
+        ? currentQ.options[currentQ.correct_answer_index]
+        : "") || currentQ.math_solution || "";
 
-    const isCorrect =
-      cleanUser === cleanExpected ||
-      cleanExpected.includes(cleanUser) ||
-      (cleanUser.length > 0 && cleanExpected.startsWith(cleanUser));
+    const cleanUser = userText.trim().replace(/\s+/g, "").toLowerCase();
+    const cleanExpected = rawExpected.trim().replace(/\s+/g, "").toLowerCase();
+
+    // Strip common math prefixes like "x=", "y=", "jawaban:", "hasil="
+    const stripPrefix = (str: string) => str.replace(/^([a-z]=|jawaban:|hasil:)/i, "").trim();
+    const valUser = stripPrefix(cleanUser);
+    const valExpected = stripPrefix(cleanExpected);
+
+    // Numeric comparison if both evaluate to valid numbers
+    const numUser = parseFloat(valUser);
+    const numExpected = parseFloat(valExpected);
+    const isNumEqual =
+      !isNaN(numUser) && !isNaN(numExpected) && Math.abs(numUser - numExpected) < 1e-6;
+
+    // String exact match on original or prefix-stripped value
+    const isStrEqual = cleanUser === cleanExpected || valUser === valExpected;
+
+    const isCorrect = isNumEqual || isStrEqual;
 
     setIsAnswered(true);
     setLastIsCorrect(isCorrect);
@@ -666,9 +1108,36 @@ export default function StudentQuizPage() {
         </div>
 
         {quiz.status === "draft" && (
-          <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl text-amber-800 text-xs font-semibold flex items-center gap-2">
-            <span>⚠️</span>
-            <span>Teacher Preview Mode: This quiz is currently saved as a draft.</span>
+          <div className="p-3.5 bg-amber-50 border border-amber-300 rounded-2xl text-amber-900 text-xs font-semibold flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xs">
+            <div className="flex items-center gap-2">
+              <span className="text-base">⚠️</span>
+              <div>
+                <span className="font-bold">Mode Pratinjau Guru (Draft)</span>
+                <p className="text-[11px] text-amber-700 font-normal">
+                  Kuis ini masih berstatus Draft. Siswa akan melihat tanda pratinjau ini hingga Anda mempublikasikannya.
+                </p>
+              </div>
+            </div>
+            {!isDemo && (
+              <button
+                type="button"
+                onClick={handlePublishNow}
+                disabled={isPublishingFromRunner}
+                className="px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs shadow-xs transition flex items-center justify-center gap-1.5 shrink-0 cursor-pointer disabled:opacity-50"
+              >
+                {isPublishingFromRunner ? (
+                  <>
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    <span>Mempublikasikan...</span>
+                  </>
+                ) : (
+                  <>
+                    <Sparkles className="w-3.5 h-3.5" />
+                    <span>Publikasikan Sekarang</span>
+                  </>
+                )}
+              </button>
+            )}
           </div>
         )}
 
@@ -782,14 +1251,36 @@ export default function StudentQuizPage() {
     <div className="max-w-3xl mx-auto space-y-6 py-4">
       {/* Teacher Preview Mode Banner */}
       {quiz.status === "draft" && (
-        <div className="p-3 bg-amber-50 border border-amber-200 rounded-2xl text-amber-800 text-xs font-semibold flex items-center justify-between gap-2 shadow-xs">
+        <div className="p-3.5 bg-amber-50 border border-amber-300 rounded-2xl text-amber-900 text-xs font-semibold flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xs">
           <div className="flex items-center gap-2">
-            <span>⚠️</span>
-            <span>Teacher Preview Mode: This quiz is currently saved as a draft.</span>
+            <span className="text-base">⚠️</span>
+            <div>
+              <span className="font-bold">Mode Pratinjau Guru (Draft)</span>
+              <p className="text-[11px] text-amber-700 font-normal">
+                Kuis ini masih berstatus Draft. Klik publikasikan agar siswa melihat versi kuis resmi.
+              </p>
+            </div>
           </div>
-          <span className="px-2.5 py-0.5 rounded-full bg-amber-200 text-amber-900 text-[10px] font-bold uppercase tracking-wider">
-            Draft Preview
-          </span>
+          {!isDemo && (
+            <button
+              type="button"
+              onClick={handlePublishNow}
+              disabled={isPublishingFromRunner}
+              className="px-3.5 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs shadow-xs transition flex items-center justify-center gap-1.5 shrink-0 cursor-pointer disabled:opacity-50"
+            >
+              {isPublishingFromRunner ? (
+                <>
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  <span>Mempublikasikan...</span>
+                </>
+              ) : (
+                <>
+                  <Sparkles className="w-3.5 h-3.5" />
+                  <span>Publikasikan Sekarang</span>
+                </>
+              )}
+            </button>
+          )}
         </div>
       )}
 
@@ -831,9 +1322,67 @@ export default function StudentQuizPage() {
           )}
         </div>
 
-        <h2 className="text-xl md:text-2xl font-bold text-slate-900 leading-snug">
-          {currentQ.question_text}
-        </h2>
+        {currentType === "FILL_IN_THE_BLANKS" ? (
+          <KidFriendlyQuestionText
+            text={currentQ.question_text}
+            renderPrompt={(promptText) => {
+              const { blankCount, parts } = parseBlanksFromText(promptText);
+              return (
+                <div className="text-lg md:text-xl font-bold text-slate-900 leading-relaxed">
+                  {parts.map((part, pIdx) => {
+                    if (part.type === "text") {
+                      return <span key={pIdx}>{part.content}</span>;
+                    }
+                    const bIdx = part.blankIndex ?? 0;
+                    const typedVal = blankCount === 1 ? (userMultiBlanks[0] ?? userText) : (userMultiBlanks[bIdx] ?? "");
+                    const res = multiBlankResults[bIdx];
+
+                    if (isAnswered && res) {
+                      return (
+                        <span
+                          key={pIdx}
+                          className={`inline-flex items-center gap-1.5 mx-1 px-3 py-1 rounded-xl text-base md:text-lg font-bold shadow-xs transition-all ${
+                            res.isCorrect
+                              ? "bg-emerald-100 text-emerald-900 border-2 border-emerald-400"
+                              : "bg-red-100 text-red-900 border-2 border-red-400 line-through"
+                          }`}
+                        >
+                          <span className="w-5 h-5 rounded-full bg-white text-xs flex items-center justify-center font-extrabold shrink-0">
+                            {bIdx + 1}
+                          </span>
+                          <span>{typedVal.trim() || "(kosong)"}</span>
+                          {res.isCorrect ? (
+                            <Check className="w-4 h-4 text-emerald-700" />
+                          ) : (
+                            <X className="w-4 h-4 text-red-700" />
+                          )}
+                        </span>
+                      );
+                    }
+
+                    return (
+                      <span
+                        key={pIdx}
+                        className={`inline-flex items-center gap-1.5 mx-1 px-3 py-1 rounded-xl text-base md:text-lg font-bold transition-all shadow-xs ${
+                          typedVal.trim()
+                            ? "bg-teal-100 text-teal-950 border-2 border-teal-400 scale-[1.02]"
+                            : "bg-amber-100 text-amber-900 border-2 border-dashed border-amber-400 animate-pulse"
+                        }`}
+                      >
+                        <span className="w-5 h-5 rounded-full bg-teal-600 text-white text-xs flex items-center justify-center font-bold shrink-0">
+                          {bIdx + 1}
+                        </span>
+                        <span>{typedVal.trim() || `[ Isian ${bIdx + 1} ]`}</span>
+                      </span>
+                    );
+                  })}
+                </div>
+              );
+            }}
+          />
+        ) : (
+          <KidFriendlyQuestionText text={currentQ.question_text} />
+        )}
 
         {/* Diagram Image */}
         {currentQ.image_url && (
@@ -850,9 +1399,15 @@ export default function StudentQuizPage() {
         {/* ======================= TYPE 1: MULTIPLE CHOICE ======================= */}
         {currentType === "MULTIPLE_CHOICE" && (
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2">
-            {currentQ.options.map((optionText, oIdx) => {
+            {(
+              currentQ.options && currentQ.options.length >= 2
+                ? currentQ.options
+                : currentQ.options && currentQ.options.length === 1
+                ? [currentQ.options[0], "Pilihan B", "Pilihan C", "Pilihan D"]
+                : ["Pilihan A", "Pilihan B", "Pilihan C", "Pilihan D"]
+            ).map((optionText, oIdx) => {
               const isSelected = selectedIndex === oIdx;
-              const isCorrectOption = oIdx === currentQ.correct_answer_index;
+              const isCorrectOption = oIdx === (currentQ.correct_answer_index ?? 0);
               const colorScheme = optionColors[oIdx % optionColors.length];
 
               let buttonStyle = `${colorScheme.bg} text-white ${colorScheme.hover}`;
@@ -907,7 +1462,16 @@ export default function StudentQuizPage() {
               { label: "Salah", idx: 1, color: "bg-rose-600 hover:bg-rose-700" },
             ].map((item) => {
               const isSelected = selectedIndex === item.idx;
-              const isCorrectOption = item.idx === currentQ.correct_answer_index;
+              let expectedIdx = currentQ.correct_answer_index ?? 0;
+              if (currentQ.options && currentQ.options.length === 2) {
+                const optText = currentQ.options[expectedIdx]?.toLowerCase() || "";
+                if (optText.includes("salah") || optText.includes("false")) {
+                  expectedIdx = 1;
+                } else if (optText.includes("benar") || optText.includes("true")) {
+                  expectedIdx = 0;
+                }
+              }
+              const isCorrectOption = item.idx === expectedIdx;
 
               let style = `${item.color} text-white`;
               if (isAnswered) {
@@ -937,23 +1501,32 @@ export default function StudentQuizPage() {
         {/* ======================= TYPE 3: MULTIPLE SELECT ======================= */}
         {currentType === "MULTIPLE_SELECT" && (
           <div className="space-y-4 pt-2">
-            <p className="text-xs font-semibold text-slate-500">
-              Pilih semua jawaban yang benar (Minimal 2 opsi):
-            </p>
+            <div className="bg-purple-50 border border-purple-200 rounded-2xl p-3.5 flex items-center justify-between gap-3">
+              <div className="flex items-center gap-2">
+                <CheckSquare className="w-5 h-5 text-purple-600 shrink-0" />
+                <span className="text-xs sm:text-sm font-bold text-purple-950">
+                  Pilihan Ganda Kompleks: Pilih semua opsi yang benar, lalu tekan &quot;Kirim Jawaban&quot;.
+                </span>
+              </div>
+              <span className="text-xs font-black text-purple-800 bg-purple-100 border border-purple-200 px-3 py-1 rounded-full shrink-0">
+                {selectedMultiIndices.length} Dipilih
+              </span>
+            </div>
+
             <div className="space-y-2.5">
               {currentQ.options.map((opt, oIdx) => {
                 const isChecked = selectedMultiIndices.includes(oIdx);
-                const isCorrect = (currentQ.correct_answers || []).includes(oIdx);
+                const isCorrect = (currentQ.correct_answers || [currentQ.correct_answer_index ?? 0]).includes(oIdx);
 
                 let cardStyle = isChecked
-                  ? "bg-purple-50 border-purple-400 text-purple-900"
-                  : "bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100";
+                  ? "bg-purple-50 border-purple-500 text-purple-950 ring-2 ring-purple-300 font-semibold"
+                  : "bg-white border-slate-200 text-slate-700 hover:bg-slate-50 hover:border-purple-300";
 
                 if (isAnswered) {
                   if (isCorrect) {
-                    cardStyle = "bg-emerald-50 border-emerald-500 text-emerald-900 font-bold";
+                    cardStyle = "bg-emerald-50 border-emerald-500 text-emerald-900 font-bold ring-2 ring-emerald-300";
                   } else if (isChecked && !isCorrect) {
-                    cardStyle = "bg-red-50 border-red-400 text-red-900";
+                    cardStyle = "bg-red-50 border-red-400 text-red-900 ring-2 ring-red-300";
                   } else {
                     cardStyle = "bg-slate-50 border-slate-200 text-slate-400 opacity-60";
                   }
@@ -962,6 +1535,7 @@ export default function StudentQuizPage() {
                 return (
                   <button
                     key={oIdx}
+                    type="button"
                     disabled={isAnswered}
                     onClick={() => toggleMultiSelect(oIdx)}
                     className={`w-full p-4 rounded-2xl border text-left flex items-center justify-between transition-all ${cardStyle}`}
@@ -972,6 +1546,9 @@ export default function StudentQuizPage() {
                       ) : (
                         <Square className="w-5 h-5 text-slate-400 shrink-0" />
                       )}
+                      <span className="w-7 h-7 rounded-xl bg-slate-100 text-slate-700 font-bold text-xs flex items-center justify-center shrink-0">
+                        {String.fromCharCode(65 + oIdx)}
+                      </span>
                       {currentQ.option_items?.[oIdx]?.image_url && (
                         /* eslint-disable-next-line @next/next/no-img-element */
                         <img
@@ -981,16 +1558,14 @@ export default function StudentQuizPage() {
                         />
                       )}
                       <span className="font-semibold text-sm">
-                        <span className="font-bold mr-2 text-slate-400">
-                          {String.fromCharCode(65 + oIdx)}.
-                        </span>
                         {opt}
                       </span>
                     </div>
 
                     {isAnswered && isCorrect && (
-                      <span className="text-xs font-bold text-emerald-600 bg-emerald-100 px-2 py-0.5 rounded-full">
-                        Kunci
+                      <span className="text-xs font-bold text-emerald-700 bg-emerald-100 border border-emerald-300 px-2.5 py-0.5 rounded-full flex items-center gap-1">
+                        <Check className="w-3.5 h-3.5" />
+                        <span>Kunci Benar</span>
                       </span>
                     )}
                   </button>
@@ -1001,12 +1576,13 @@ export default function StudentQuizPage() {
             {!isAnswered && (
               <div className="flex justify-end pt-2">
                 <button
-                  disabled={selectedMultiIndices.length < 2}
+                  type="button"
+                  disabled={selectedMultiIndices.length === 0}
                   onClick={handleSubmitMultiSelect}
-                  className="px-6 py-3 bg-purple-600 text-white font-bold text-sm rounded-xl shadow-md hover:bg-purple-700 disabled:opacity-40 transition flex items-center gap-2"
+                  className="px-6 py-3.5 bg-purple-600 text-white font-bold text-sm rounded-xl shadow-md hover:bg-purple-700 disabled:opacity-40 disabled:cursor-not-allowed transition flex items-center gap-2"
                 >
                   <Send className="w-4 h-4" />
-                  <span>Kirim Jawaban ({selectedMultiIndices.length} dipilih)</span>
+                  <span>Kirim Jawaban ({selectedMultiIndices.length} opsi dipilih)</span>
                 </button>
               </div>
             )}
@@ -1015,61 +1591,180 @@ export default function StudentQuizPage() {
 
         {/* ======================= TYPE 4: MATCHING ======================= */}
         {currentType === "MATCHING" && (
-          <div className="space-y-4 pt-2">
-            <p className="text-xs font-semibold text-slate-500">
-              Jodohkan item di kolom kiri dengan pasangan yang tepat di kolom kanan:
-            </p>
+          <div className="space-y-5 pt-2">
+            <div className="p-3.5 bg-amber-50 border border-amber-200 rounded-2xl flex items-center justify-between gap-3 text-amber-950">
+              <div className="flex items-center gap-2.5">
+                <Layers className="w-5 h-5 text-amber-600 shrink-0" />
+                <span className="text-xs sm:text-sm font-semibold">
+                  Tarik (*drag*) kartu pasangan di bawah ke kotak target, atau ketuk kartu lalu ketuk kotak yang dituju:
+                </span>
+              </div>
+              <span className="text-xs font-black text-amber-800 bg-amber-100 border border-amber-200 px-3 py-1 rounded-full shrink-0">
+                {Object.keys(userMatches).length} / {currentQ.matching_pairs?.length || 0} Terpasang
+              </span>
+            </div>
 
+            {/* Target Slots Grid */}
             <div className="space-y-3">
               {(currentQ.matching_pairs || []).map((pair, pIdx) => {
                 const selectedVal = userMatches[pair.left] || "";
                 const isMatchCorrect = isAnswered && selectedVal === pair.right;
+                const isDropTargetActive = selectedMatchingChip && !isAnswered && !selectedVal;
 
                 return (
                   <div
                     key={pIdx}
-                    className={`p-4 rounded-2xl border transition grid grid-cols-1 sm:grid-cols-2 gap-3 items-center ${
+                    className={`p-4 rounded-2xl border-2 transition-all grid grid-cols-1 sm:grid-cols-2 gap-3 items-center shadow-xs ${
                       isAnswered
                         ? isMatchCorrect
-                          ? "bg-emerald-50 border-emerald-300"
-                          : "bg-red-50 border-red-300"
-                        : "bg-slate-50 border-slate-200"
+                          ? "bg-emerald-50/80 border-emerald-400 ring-2 ring-emerald-200"
+                          : "bg-red-50/80 border-red-300 ring-2 ring-red-200"
+                        : "bg-white border-slate-200 hover:border-amber-300"
                     }`}
                   >
-                    <div className="font-semibold text-sm text-slate-800 flex items-center gap-2">
-                      <span className="w-6 h-6 rounded-full bg-slate-200 text-slate-700 text-xs flex items-center justify-center font-bold shrink-0">
+                    {/* Left Stimulus */}
+                    <div className="font-bold text-sm text-slate-800 flex items-center gap-2.5">
+                      <span className="w-7 h-7 rounded-xl bg-amber-100 text-amber-900 text-xs flex items-center justify-center font-black shrink-0">
                         {pIdx + 1}
                       </span>
                       <span>{pair.left}</span>
                     </div>
 
+                    {/* Right Match Slot */}
                     <div>
                       {isAnswered ? (
-                        <div className="text-xs font-bold text-slate-700 flex flex-col gap-0.5">
-                          <span>Jawaban Kamu: {selectedVal || "(Belum dipilih)"}</span>
+                        <div className="space-y-1">
+                          <div
+                            className={`px-4 py-2.5 rounded-xl font-bold text-xs sm:text-sm flex items-center justify-between ${
+                              isMatchCorrect
+                                ? "bg-emerald-600 text-white shadow-xs"
+                                : "bg-red-600 text-white shadow-xs"
+                            }`}
+                          >
+                            <span>{selectedVal || "(Tidak dijawab)"}</span>
+                            {isMatchCorrect ? (
+                              <Check className="w-4 h-4 text-emerald-100 shrink-0" />
+                            ) : (
+                              <X className="w-4 h-4 text-red-100 shrink-0" />
+                            )}
+                          </div>
                           {!isMatchCorrect && (
-                            <span className="text-emerald-700">Kunci Benar: {pair.right}</span>
+                            <p className="text-xs font-bold text-emerald-700 pl-1">
+                              ✓ Kunci Benar: {pair.right}
+                            </p>
                           )}
                         </div>
+                      ) : selectedVal ? (
+                        /* Slotted Item Card */
+                        <div className="px-4 py-2.5 rounded-xl bg-amber-500 text-white font-bold text-xs sm:text-sm shadow-sm flex items-center justify-between gap-2 animate-pop">
+                          <div className="flex items-center gap-2 truncate">
+                            <Check className="w-4 h-4 text-amber-200 shrink-0" />
+                            <span className="truncate">{selectedVal}</span>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => handleUnassignPairMatch(pair.left)}
+                            className="w-5 h-5 rounded-full bg-white/20 hover:bg-white/30 text-white flex items-center justify-center text-xs font-black transition shrink-0"
+                            title="Lepas pasangan (kembalikan ke wadah)"
+                          >
+                            ×
+                          </button>
+                        </div>
                       ) : (
-                        <select
-                          value={selectedVal}
-                          onChange={(e) => handleSetPairMatch(pair.left, e.target.value)}
-                          className="w-full p-2.5 rounded-xl border border-slate-300 bg-white text-sm font-medium focus:ring-2 focus:ring-indigo-500 focus:outline-hidden"
+                        /* Empty Drop Target Slot */
+                        <div
+                          onDragOver={(e) => e.preventDefault()}
+                          onDrop={(e) => {
+                            e.preventDefault();
+                            const dropped = e.dataTransfer.getData("text/plain") || draggedMatchingChip;
+                            if (dropped) handleSetPairMatch(pair.left, dropped);
+                          }}
+                          onClick={() => {
+                            if (selectedMatchingChip) {
+                              handleSetPairMatch(pair.left, selectedMatchingChip);
+                            }
+                          }}
+                          className={`p-3 rounded-xl border-2 border-dashed transition-all flex items-center justify-between text-xs font-bold cursor-pointer select-none ${
+                            isDropTargetActive
+                              ? "border-amber-500 bg-amber-100/70 text-amber-900 ring-2 ring-amber-300 animate-pulse"
+                              : "border-slate-300 bg-slate-50/80 text-slate-500 hover:bg-amber-50 hover:border-amber-300 hover:text-amber-800"
+                          }`}
                         >
-                          <option value="">-- Pilih Pasangan --</option>
-                          {(currentQ.matching_pairs || []).map((p, rIdx) => (
-                            <option key={rIdx} value={p.right}>
-                              {p.right}
-                            </option>
-                          ))}
-                        </select>
+                          <span>
+                            {selectedMatchingChip
+                              ? "+ Ketuk di sini untuk memasangkan"
+                              : "Tarik kartu ke sini atau pilih di bawah"}
+                          </span>
+                          <ArrowRight className="w-4 h-4 text-slate-400 shrink-0" />
+                        </div>
                       )}
                     </div>
                   </div>
                 );
               })}
             </div>
+
+            {/* Available Right Items Pool (Only shown before submitting) */}
+            {!isAnswered && (
+              <div className="p-4 bg-slate-50 border border-slate-200 rounded-2xl space-y-2.5">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold text-slate-700 block">
+                    Pilihan Kartu Pasangan (Tarik atau Ketuk Kartu):
+                  </span>
+                  {selectedMatchingChip && (
+                    <button
+                      type="button"
+                      onClick={() => setSelectedMatchingChip(null)}
+                      className="text-[11px] font-bold text-slate-500 hover:text-slate-700 underline cursor-pointer"
+                    >
+                      Batalkan Pilihan Kartu
+                    </button>
+                  )}
+                </div>
+
+                <div className="flex flex-wrap gap-2.5">
+                  {(shuffledMatchingOptions.length > 0
+                    ? shuffledMatchingOptions
+                    : (currentQ.matching_pairs || []).map((p) => p.right)
+                  ).map((rightText, rIdx) => {
+                    const isAssigned = Object.values(userMatches).includes(rightText);
+                    const isSelected = selectedMatchingChip === rightText;
+
+                    if (isAssigned) {
+                      return null; // Opsi yang sudah terpasang disembunyikan dari pool (Strict 1-to-1)
+                    }
+
+                    return (
+                      <div
+                        key={rIdx}
+                        draggable={true}
+                        onDragStart={(e) => {
+                          e.dataTransfer.setData("text/plain", rightText);
+                          setDraggedMatchingChip(rightText);
+                        }}
+                        onDragEnd={() => setDraggedMatchingChip(null)}
+                        onClick={() => setSelectedMatchingChip(isSelected ? null : rightText)}
+                        className={`px-4 py-2.5 rounded-xl font-bold text-xs sm:text-sm shadow-xs transition-all cursor-grab active:cursor-grabbing select-none flex items-center gap-2 border ${
+                          isSelected
+                            ? "bg-amber-600 text-white ring-4 ring-amber-300 scale-105 shadow-md"
+                            : "bg-white text-slate-800 border-slate-200 hover:border-amber-400 hover:shadow-xs"
+                        }`}
+                      >
+                        <Tag className="w-3.5 h-3.5 text-amber-500" />
+                        <span>{rightText}</span>
+                      </div>
+                    );
+                  })}
+
+                  {Object.keys(userMatches).length === (currentQ.matching_pairs?.length || 0) && (
+                    <p className="text-xs text-emerald-700 font-bold py-1 flex items-center gap-1.5">
+                      <Check className="w-4 h-4 text-emerald-600" />
+                      <span>Semua pasangan telah terpasang! Anda dapat mengirim jawaban di bawah.</span>
+                    </p>
+                  )}
+                </div>
+              </div>
+            )}
 
             {!isAnswered && (
               <div className="flex justify-end pt-2">
@@ -1088,99 +1783,329 @@ export default function StudentQuizPage() {
           </div>
         )}
 
-        {/* ======================= TYPE 5: REORDER ======================= */}
+        {/* ======================= TYPE 5: REORDER (Ramah Siswa SD) ======================= */}
         {currentType === "REORDER" && (
           <div className="space-y-4 pt-2">
-            <p className="text-xs font-semibold text-slate-500">
-              Urutkan tahapan atau langkah-langkah berikut dari awal hingga akhir (1 ke {userOrder.length}):
-            </p>
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 p-3.5 bg-indigo-50/90 border border-indigo-200 rounded-2xl">
+              <div className="flex items-center gap-2.5">
+                <span className="p-2 bg-indigo-600 text-white rounded-xl shadow-xs">
+                  <ArrowUpDown className="w-4 h-4" />
+                </span>
+                <div>
+                  <h4 className="text-xs font-bold text-indigo-950">Cara Mengurutkan (Khusus Siswa SD):</h4>
+                  <p className="text-[11px] text-indigo-700">
+                    Bisa <strong>geser kartu (drag)</strong>, atau cukup <strong>ketuk kartu lalu ketuk kartu lain untuk bertukar posisi</strong>, atau tekan panah ⬆️ ⬇️.
+                  </p>
+                </div>
+              </div>
+              <span className="text-[11px] font-bold text-indigo-800 bg-white px-2.5 py-1 rounded-full border border-indigo-200 self-start sm:self-auto shrink-0 shadow-xs">
+                1 (Awal) ➔ {userOrder.length} (Akhir)
+              </span>
+            </div>
 
-            <div className="space-y-2.5">
-              {userOrder.map((item, idx) => (
-                <div
-                  key={idx}
-                  className="p-3.5 bg-slate-50 border border-slate-200 rounded-2xl flex items-center justify-between gap-3 shadow-xs"
+            {/* Tap-to-Swap Helper Banner */}
+            {selectedReorderIndex !== null && !isAnswered && (
+              <div className="p-3 bg-amber-50 border-2 border-amber-300 rounded-2xl flex items-center justify-between gap-3 animate-pulse">
+                <div className="flex items-center gap-2 text-xs font-bold text-amber-900">
+                  <Sparkles className="w-4 h-4 text-amber-600 shrink-0" />
+                  <span>
+                    Langkah <strong>#{selectedReorderIndex + 1} ({userOrder[selectedReorderIndex]})</strong> dipilih! Sekarang ketuk langkah lain untuk bertukar posisi.
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setSelectedReorderIndex(null)}
+                  className="px-2.5 py-1 bg-white border border-amber-300 text-amber-800 text-xs font-bold rounded-lg hover:bg-amber-100 shrink-0"
                 >
-                  <div className="flex items-center gap-3">
-                    <span className="w-8 h-8 rounded-xl bg-cyan-100 text-cyan-800 font-bold text-sm flex items-center justify-center shrink-0">
-                      {idx + 1}
-                    </span>
-                    <span className="font-medium text-sm text-slate-800">{item}</span>
+                  Batal
+                </button>
+              </div>
+            )}
+
+            {(() => {
+              const origItems = currentQ.reorder_items || [];
+              const cOrder = currentQ.correct_order || [];
+              const expItems =
+                cOrder.length === origItems.length && origItems.length > 0
+                  ? [...origItems]
+                      .map((item, i) => ({ item, order: cOrder[i] || i + 1 }))
+                      .sort((a, b) => a.order - b.order)
+                      .map((x) => x.item)
+                  : origItems;
+
+              return (
+                <>
+                  <div className="space-y-3">
+                    {userOrder.map((item, idx) => {
+                      const isPosCorrect = isAnswered && item === expItems[idx];
+                      const isSelectedForSwap = selectedReorderIndex === idx;
+                      const stepTheme = STEP_COLORS[idx % STEP_COLORS.length];
+
+                      return (
+                        <div key={idx} className="flex flex-col items-center">
+                          {idx > 0 && (
+                            <div className="flex items-center gap-1.5 py-1 text-slate-300">
+                              <div className="w-0.5 h-3 bg-slate-200" />
+                              <ChevronDown className="w-3.5 h-3.5 text-slate-400" />
+                              <div className="w-0.5 h-3 bg-slate-200" />
+                            </div>
+                          )}
+
+                          <div
+                            draggable={!isAnswered}
+                            onDragStart={(e) => handleDragStartReorder(e, idx)}
+                            onDragOver={handleDragOverReorder}
+                            onDrop={(e) => handleDropReorder(e, idx)}
+                            onClick={() => handleTapReorderItem(idx)}
+                            className={`w-full p-3.5 md:p-4 border-2 rounded-2xl flex items-center justify-between gap-3 shadow-xs transition-all select-none ${
+                              isAnswered
+                                ? isPosCorrect
+                                  ? "bg-emerald-50/90 border-emerald-400"
+                                  : "bg-red-50/90 border-red-400"
+                                : isSelectedForSwap
+                                ? "bg-amber-50 border-amber-400 ring-4 ring-amber-300 scale-[1.02] shadow-md cursor-pointer"
+                                : "bg-white border-slate-200 hover:border-indigo-300 hover:shadow-md cursor-grab active:cursor-grabbing"
+                            }`}
+                          >
+                            <div className="flex items-center gap-3 md:gap-4 min-w-0">
+                              {!isAnswered && (
+                                <div className="text-slate-400 hover:text-indigo-600 shrink-0 cursor-grab">
+                                  <GripVertical className="w-5 h-5" />
+                                </div>
+                              )}
+
+                              <div
+                                className={`w-9 h-9 md:w-10 md:h-10 rounded-xl font-extrabold text-sm md:text-base flex items-center justify-center shrink-0 shadow-xs ${
+                                  isAnswered
+                                    ? isPosCorrect
+                                      ? "bg-emerald-500 text-white"
+                                      : "bg-red-500 text-white"
+                                    : `${stepTheme.bg} ${stepTheme.text}`
+                                }`}
+                              >
+                                {idx + 1}
+                              </div>
+
+                              <div className="min-w-0">
+                                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">
+                                  Langkah {idx + 1}
+                                </span>
+                                <span className="font-bold text-sm md:text-base text-slate-800 break-words">
+                                  {item}
+                                </span>
+                              </div>
+                            </div>
+
+                            {!isAnswered ? (
+                              <div className="flex items-center gap-1.5 shrink-0" onClick={(e) => e.stopPropagation()}>
+                                <button
+                                  type="button"
+                                  onClick={() => moveOrderItem(idx, "up")}
+                                  disabled={idx === 0}
+                                  className="w-10 h-10 min-w-[40px] min-h-[40px] rounded-xl border border-slate-200 bg-slate-50 hover:bg-indigo-50 hover:text-indigo-600 disabled:opacity-20 transition flex items-center justify-center shadow-xs"
+                                  title="Geser ke atas"
+                                >
+                                  <ChevronUp className="w-5 h-5 text-slate-700" />
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => moveOrderItem(idx, "down")}
+                                  disabled={idx === userOrder.length - 1}
+                                  className="w-10 h-10 min-w-[40px] min-h-[40px] rounded-xl border border-slate-200 bg-slate-50 hover:bg-indigo-50 hover:text-indigo-600 disabled:opacity-20 transition flex items-center justify-center shadow-xs"
+                                  title="Geser ke bawah"
+                                >
+                                  <ChevronDown className="w-5 h-5 text-slate-700" />
+                                </button>
+                              </div>
+                            ) : isPosCorrect ? (
+                              <span className="text-xs font-bold text-emerald-800 bg-emerald-100 border border-emerald-300 px-3 py-1 rounded-full flex items-center gap-1 shrink-0">
+                                <Check className="w-4 h-4 text-emerald-600" /> Posisi Tepat
+                              </span>
+                            ) : (
+                              <span className="text-xs font-bold text-red-800 bg-red-100 border border-red-300 px-3 py-1 rounded-full flex items-center gap-1 shrink-0">
+                                <X className="w-4 h-4 text-red-600" /> Posisi Salah
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
                   </div>
 
-                  {!isAnswered && (
-                    <div className="flex items-center gap-1 shrink-0">
-                      <button
-                        onClick={() => moveOrderItem(idx, "up")}
-                        disabled={idx === 0}
-                        className="p-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-100 disabled:opacity-20 transition"
-                      >
-                        <ChevronUp className="w-4 h-4 text-slate-600" />
-                      </button>
-                      <button
-                        onClick={() => moveOrderItem(idx, "down")}
-                        disabled={idx === userOrder.length - 1}
-                        className="p-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-100 disabled:opacity-20 transition"
-                      >
-                        <ChevronDown className="w-4 h-4 text-slate-600" />
-                      </button>
+                  {isAnswered && !lastIsCorrect && (
+                    <div className="p-4 bg-cyan-50 border-2 border-cyan-200 rounded-2xl space-y-2 text-xs text-cyan-950">
+                      <span className="font-bold text-cyan-900 flex items-center gap-1.5 text-sm">
+                        <Check className="w-4 h-4 text-cyan-700" />
+                        <span>Kunci Urutan Tahapan yang Tepat:</span>
+                      </span>
+                      <ol className="list-decimal list-inside space-y-1 font-semibold pl-1">
+                        {expItems.map((it, eIdx) => (
+                          <li key={eIdx} className="text-cyan-900">
+                            {it}
+                          </li>
+                        ))}
+                      </ol>
                     </div>
                   )}
-                </div>
-              ))}
-            </div>
+                </>
+              );
+            })()}
 
             {!isAnswered && (
               <div className="flex justify-end pt-2">
                 <button
+                  type="button"
                   onClick={handleSubmitReorder}
-                  className="px-6 py-3 bg-cyan-600 text-white font-bold text-sm rounded-xl shadow-md hover:bg-cyan-700 transition flex items-center gap-2"
+                  className="px-6 py-3.5 bg-indigo-600 text-white font-bold text-sm md:text-base rounded-2xl shadow-md hover:bg-indigo-700 transition flex items-center gap-2"
                 >
                   <Send className="w-4 h-4" />
-                  <span>Kirim Urutan Langkah</span>
+                  <span>Kirim Urutan Jawaban</span>
                 </button>
               </div>
             )}
           </div>
         )}
 
-        {/* ======================= TYPE 6: FILL IN THE BLANKS ======================= */}
+        {/* ======================= TYPE 6: FILL IN THE BLANKS (Multi & Single Blank) ======================= */}
         {currentType === "FILL_IN_THE_BLANKS" && (
           <div className="space-y-4 pt-2">
-            <p className="text-xs font-semibold text-slate-500">
-              Isi bagian rumpang [___] dengan kata kunci yang tepat:
-            </p>
+            {(() => {
+              const { blankCount } = parseBlanksFromText(currentQ.question_text);
+              const isMulti = blankCount > 1;
+              const allFilled = Array.from({ length: blankCount }).every((_, i) => {
+                const val = isMulti ? (userMultiBlanks[i] || "") : (userMultiBlanks[0] || userText || "");
+                return val.trim().length > 0;
+              });
 
-            <div className="space-y-3">
-              <input
-                type="text"
-                disabled={isAnswered}
-                value={userText}
-                onChange={(e) => setUserText(e.target.value)}
-                placeholder="Ketik kata kunci jawaban..."
-                className="w-full p-4 rounded-2xl border border-slate-300 text-slate-900 font-semibold text-base focus:ring-2 focus:ring-teal-500 focus:outline-hidden"
-              />
+              return (
+                <>
+                  <div className="p-3.5 bg-teal-50 border border-teal-200 rounded-2xl flex items-center gap-2.5">
+                    <span className="p-2 bg-teal-600 text-white rounded-xl shadow-xs">
+                      <Sparkles className="w-4 h-4" />
+                    </span>
+                    <div>
+                      <h4 className="text-xs font-bold text-teal-950">
+                        {isMulti
+                          ? `Soal memiliki ${blankCount} bagian rumpang. Isi setiap kotak di bawah:`
+                          : "Isi bagian rumpang dengan kata kunci yang tepat:"}
+                      </h4>
+                      <p className="text-[11px] text-teal-700">
+                        {isMulti
+                          ? "Kata yang kamu ketik akan otomatis mengisi kalimat soal di atas secara waktu-nyata."
+                          : "Ketik kata jawabanmu di kotak bawah, lalu klik Kirim Isian."}
+                      </p>
+                    </div>
+                  </div>
 
-              {!isAnswered ? (
-                <div className="flex justify-end">
-                  <button
-                    disabled={!userText.trim()}
-                    onClick={handleSubmitFillIn}
-                    className="px-6 py-3 bg-teal-600 text-white font-bold text-sm rounded-xl shadow-md hover:bg-teal-700 disabled:opacity-40 transition flex items-center gap-2"
-                  >
-                    <Send className="w-4 h-4" />
-                    <span>Kirim Isian</span>
-                  </button>
-                </div>
-              ) : (
-                <div className="p-3 bg-teal-50 border border-teal-200 rounded-xl text-xs font-semibold text-teal-900">
-                  <span>Kata Kunci Kunci: </span>
-                  <span className="font-bold">
-                    {(currentQ.blanks_keywords || []).join(", ") || currentQ.options[currentQ.correct_answer_index]}
-                  </span>
-                </div>
-              )}
-            </div>
+                  {/* Dedicated Numbered Input Fields */}
+                  {isMulti ? (
+                    <div className="space-y-3">
+                      {Array.from({ length: blankCount }).map((_, bIdx) => {
+                        const val = userMultiBlanks[bIdx] || "";
+                        const res = multiBlankResults[bIdx];
+                        const expKeywords = getExpectedKeywordsForBlank(currentQ, bIdx, blankCount);
+
+                        return (
+                          <div
+                            key={bIdx}
+                            className={`p-4 rounded-2xl border-2 transition-all ${
+                              isAnswered
+                                ? res?.isCorrect
+                                  ? "bg-emerald-50/90 border-emerald-300"
+                                  : "bg-red-50/90 border-red-300"
+                                : "bg-white border-slate-200 focus-within:border-teal-400 focus-within:ring-4 focus-within:ring-teal-100"
+                            }`}
+                          >
+                            <div className="flex items-center justify-between mb-2">
+                              <div className="flex items-center gap-2">
+                                <span className="w-7 h-7 rounded-xl bg-teal-600 text-white font-bold text-xs flex items-center justify-center shadow-xs">
+                                  {bIdx + 1}
+                                </span>
+                                <span className="font-bold text-sm text-slate-800">
+                                  Kotak Isian Bagian ({bIdx + 1})
+                                </span>
+                              </div>
+                              {isAnswered && (
+                                <span
+                                  className={`text-xs font-bold px-2.5 py-0.5 rounded-full flex items-center gap-1 ${
+                                    res?.isCorrect
+                                      ? "bg-emerald-100 text-emerald-800"
+                                      : "bg-red-100 text-red-800"
+                                  }`}
+                                >
+                                  {res?.isCorrect ? <Check className="w-3.5 h-3.5" /> : <X className="w-3.5 h-3.5" />}
+                                  <span>{res?.isCorrect ? "Tepat" : "Kurang Tepat"}</span>
+                                </span>
+                              )}
+                            </div>
+
+                            <input
+                              type="text"
+                              disabled={isAnswered}
+                              value={val}
+                              onChange={(e) =>
+                                setUserMultiBlanks((prev) => ({ ...prev, [bIdx]: e.target.value }))
+                              }
+                              placeholder={`Ketik kata untuk isian (${bIdx + 1}) di kalimat atas...`}
+                              className="w-full p-3.5 rounded-xl border border-slate-300 text-slate-900 font-semibold text-base focus:ring-2 focus:ring-teal-500 focus:outline-hidden disabled:bg-slate-50"
+                            />
+
+                            {isAnswered && !res?.isCorrect && (
+                              <div className="mt-2 text-xs font-bold text-emerald-800 bg-emerald-50 border border-emerald-200 px-3 py-1.5 rounded-xl flex items-center gap-1.5">
+                                <Check className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                                <span>Kunci Bagian ({bIdx + 1}): <strong>{res?.key || expKeywords.join(" / ")}</strong></span>
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      <input
+                        type="text"
+                        disabled={isAnswered}
+                        value={userMultiBlanks[0] !== undefined ? userMultiBlanks[0] : userText}
+                        onChange={(e) => {
+                          setUserText(e.target.value);
+                          setUserMultiBlanks({ 0: e.target.value });
+                        }}
+                        placeholder="Ketik kata kunci jawaban..."
+                        className="w-full p-4 rounded-2xl border-2 border-slate-200 text-slate-900 font-semibold text-base focus:border-teal-400 focus:ring-4 focus:ring-teal-100 focus:outline-hidden disabled:bg-slate-50"
+                      />
+
+                      {isAnswered && (
+                        <div className="p-3.5 bg-teal-50 border border-teal-200 rounded-2xl text-xs font-semibold text-teal-900 flex items-center gap-2">
+                          <Check className="w-4 h-4 text-teal-700 shrink-0" />
+                          <span>
+                            Kata Kunci yang Diterima:{" "}
+                            <strong className="font-bold">
+                              {(currentQ.blanks_keywords || []).join(" / ") ||
+                                currentQ.options[currentQ.correct_answer_index] ||
+                                "Sesuai materi"}
+                            </strong>
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {!isAnswered && (
+                    <div className="flex justify-end pt-2">
+                      <button
+                        type="button"
+                        disabled={!allFilled}
+                        onClick={handleSubmitFillIn}
+                        className="px-6 py-3.5 bg-teal-600 text-white font-bold text-sm md:text-base rounded-2xl shadow-md hover:bg-teal-700 disabled:opacity-40 transition flex items-center gap-2"
+                      >
+                        <Send className="w-4 h-4" />
+                        <span>Kirim Isian Jawaban</span>
+                      </button>
+                    </div>
+                  )}
+                </>
+              );
+            })()}
           </div>
         )}
 
@@ -1350,8 +2275,10 @@ export default function StudentQuizPage() {
                   Pilih Kartu Label di Bawah:
                 </span>
                 <div className="flex flex-wrap gap-2">
-                  {(currentQ.label_targets || []).map((pin, lIdx) => {
-                    const labelText = pin.label;
+                  {(shuffledLabelChips.length > 0
+                    ? shuffledLabelChips
+                    : (currentQ.label_targets || []).map((t) => t.label)
+                  ).map((labelText, lIdx) => {
                     const isAssigned = Object.values(userLabelMatches).includes(labelText);
                     const isSelected = selectedLabelChip === labelText;
 
@@ -1509,7 +2436,10 @@ export default function StudentQuizPage() {
                   Kartu Item yang Belum Dikelompokkan:
                 </span>
                 <div className="flex flex-wrap gap-2">
-                  {(currentQ.categorize_items || [])
+                  {(shuffledCategorizeItems.length > 0
+                    ? shuffledCategorizeItems
+                    : currentQ.categorize_items || []
+                  )
                     .filter((item) => {
                       return !Object.values(userCategorization).some((arr) => arr.includes(item.text));
                     })
