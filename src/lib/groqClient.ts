@@ -12,12 +12,13 @@
  */
 
 const GROQ_TEXT_MODELS = [
-  "meta-llama/llama-4-scout-17b-16e-instruct",
   "llama-3.3-70b-versatile",
   "llama-3.1-8b-instant",
+  "llama-3.1-70b-versatile",
   "llama3-70b-8192",
   "llama3-8b-8192",
   "gemma2-9b-it",
+  "mixtral-8x7b-32768",
 ];
 
 const GROQ_VISION_MODELS = [
@@ -26,28 +27,102 @@ const GROQ_VISION_MODELS = [
   "llama-3.2-90b-vision-preview",
 ];
 
+/**
+ * Fetch available models dynamically for the given API key.
+ * This guarantees we only request models that the user's specific account has access to.
+ */
+async function getAvailableGroqModels(
+  apiKey: string
+): Promise<{ ok: boolean; status: number; models: string[]; error?: string }> {
+  try {
+    const res = await fetch("https://api.groq.com/openai/v1/models", {
+      headers: { Authorization: `Bearer ${apiKey.trim()}` },
+      signal: AbortSignal.timeout(8000),
+    });
+    const body = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      const msg = body?.error?.message || `HTTP ${res.status}`;
+      return { ok: false, status: res.status, models: [], error: msg };
+    }
+    const data = Array.isArray(body?.data) ? body.data : [];
+    const allIds: string[] = data.map((m: any) => m.id as string).filter(Boolean);
+
+    // Prioritize high-quality chat models
+    const preferredOrder = [
+      "llama-3.3-70b-versatile",
+      "llama-3.1-8b-instant",
+      "llama-3.1-70b-versatile",
+      "llama3-70b-8192",
+      "llama3-8b-8192",
+      "gemma2-9b-it",
+      "mixtral-8x7b-32768",
+    ];
+
+    const sorted = [
+      ...preferredOrder.filter((id) => allIds.includes(id)),
+      ...allIds.filter(
+        (id) =>
+          !preferredOrder.includes(id) &&
+          !id.includes("whisper") &&
+          !id.includes("guard") &&
+          !id.includes("embed")
+      ),
+    ];
+
+    return { ok: true, status: 200, models: sorted };
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
+    return { ok: false, status: 0, models: [], error: msg };
+  }
+}
+
 async function groqChatCompletion(
   model: string,
   messages: any[],
   apiKey: string,
-  timeout = 45000
+  timeout = 45000,
+  useJsonFormat = true
 ): Promise<{ ok: boolean; status: number; body: any }> {
+  const payload: any = {
+    model,
+    messages,
+    temperature: 0.2,
+  };
+  if (useJsonFormat) {
+    payload.response_format = { type: "json_object" };
+  }
+
   const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
     method: "POST",
     headers: {
       Authorization: `Bearer ${apiKey.trim()}`,
       "Content-Type": "application/json",
     },
-    body: JSON.stringify({
-      model,
-      messages,
-      response_format: { type: "json_object" },
-      temperature: 0.2,
-    }),
+    body: JSON.stringify(payload),
     signal: AbortSignal.timeout(timeout),
   });
   const body = await response.json().catch(() => ({}));
+
+  // If 400 and json_object was requested, retry once without json_object
+  if (!response.ok && response.status === 400 && useJsonFormat) {
+    return groqChatCompletion(model, messages, apiKey, timeout, false);
+  }
+
   return { ok: response.ok, status: response.status, body };
+}
+
+function parseJsonSafely(content: string): any {
+  try {
+    return JSON.parse(content);
+  } catch {
+    let clean = content.trim();
+    if (clean.startsWith("```json")) {
+      clean = clean.replace(/^```json/, "").replace(/```$/, "").trim();
+    } else if (clean.startsWith("```")) {
+      clean = clean.replace(/^```/, "").replace(/```$/, "").trim();
+    }
+    return JSON.parse(clean);
+  }
 }
 
 export async function parseQuizWithGroqText(
@@ -63,26 +138,37 @@ export async function parseQuizWithGroqText(
     },
   ];
 
+  // 1. Check available models dynamically from the user's Groq key
+  const modelsCheck = await getAvailableGroqModels(apiKey);
+  if (!modelsCheck.ok && modelsCheck.status === 401) {
+    return {
+      success: false,
+      error: `API Key Groq tidak valid atau ditolak oleh server Groq (HTTP 401: ${modelsCheck.error}). Periksa kembali API Key Groq Anda di Pengaturan.`,
+      triedModels: [],
+    };
+  }
+
+  const candidateModels = modelsCheck.models.length > 0 ? modelsCheck.models : GROQ_TEXT_MODELS;
   const triedModels: string[] = [];
   let lastError = "";
 
-  for (const model of GROQ_TEXT_MODELS) {
+  for (const model of candidateModels) {
     triedModels.push(model);
     try {
       const { ok, status, body } = await groqChatCompletion(model, messages, apiKey);
 
       if (!ok) {
-        const errText = JSON.stringify(body);
+        const errDetail = body?.error?.message || JSON.stringify(body);
         // 404/400 = model not found or no access → try next model
         if (status === 404 || status === 400) {
-          lastError = `Model '${model}' tidak tersedia (HTTP ${status})`;
+          lastError = `Model '${model}' (HTTP ${status}): ${errDetail}`;
           console.warn(`[groqClient] ${lastError}`);
           continue;
         }
-        // 429 = rate limit → stop trying (no point trying other models with same key)
+        // 429 = rate limit → stop trying
         return {
           success: false,
-          error: `Groq rate limited (429). Coba lagi dalam 1 menit.`,
+          error: `Groq rate limited (HTTP 429: ${errDetail}). Coba lagi dalam beberapa saat.`,
           triedModels,
         };
       }
@@ -93,7 +179,7 @@ export async function parseQuizWithGroqText(
         continue;
       }
 
-      const parsed = JSON.parse(content);
+      const parsed = parseJsonSafely(content);
       return { success: true, data: parsed, model, triedModels };
     } catch (err: unknown) {
       lastError = err instanceof Error ? err.message : String(err);
@@ -103,7 +189,7 @@ export async function parseQuizWithGroqText(
 
   return {
     success: false,
-    error: `Semua model Groq gagal. Model dicoba: ${triedModels.join(", ")}. Error terakhir: ${lastError}`,
+    error: `Semua model Groq (${triedModels.length} model) gagal. Penyebab: ${lastError}`,
     triedModels,
   };
 }
@@ -157,7 +243,7 @@ export async function parseQuizWithGroqVision(
         continue;
       }
 
-      const parsed = JSON.parse(content);
+      const parsed = parseJsonSafely(content);
       return { success: true, data: parsed, model, triedModels };
     } catch (err: unknown) {
       lastError = err instanceof Error ? err.message : String(err);
@@ -200,7 +286,7 @@ export async function generateQuizWithGroq(
         continue;
       }
 
-      const parsed = JSON.parse(content);
+      const parsed = parseJsonSafely(content);
       return { success: true, data: parsed, model };
     } catch (err: unknown) {
       lastError = err instanceof Error ? err.message : String(err);

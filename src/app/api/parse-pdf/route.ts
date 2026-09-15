@@ -398,8 +398,10 @@ PANDUAN DETEKSI GAMBAR (DIAGRAM SOAL & GAMBAR OPSI):
       });
     }
 
-    // If Gemini models failed, try Groq Cloud AI as fallback!
-    if (!responseText && groqApiKey && !extractionSteps.find((s) => s.id === "groq" && s.status === "success")) {
+    // If Gemini models failed, try Groq Cloud AI as final fallback
+    // Only run if Groq hasn't been tried yet in this request (prevent duplicate)
+    const groqAlreadyTried = extractionSteps.some((s) => s.id === "groq");
+    if (!responseText && groqApiKey && !groqAlreadyTried) {
       console.log(`[parse-pdf] Gemini models failed, running Groq Cloud AI fallback...`);
       await tryGroq();
     }
