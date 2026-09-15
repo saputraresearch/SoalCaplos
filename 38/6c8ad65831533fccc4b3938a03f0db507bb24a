@@ -1,0 +1,14 @@
+src/app/api/parse-pdf/route.ts
+  h_7310902349a227 149,155-158,161,173-174,177-182,197,203,206-209,211-214,216-217,219,227
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "386c8ad65831533fccc4b3938a03f0db507bb24a",
+  "prompts": {},
+  "humans": {
+    "h_7310902349a227": {
+      "author": "saputra.a.pratama <saputra.a.pratama@gdn-commerce.com>"
+    }
+  }
+}
