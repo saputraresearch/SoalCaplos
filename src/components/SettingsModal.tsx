@@ -9,10 +9,8 @@ interface SettingsModalProps {
 }
 
 const AVAILABLE_MODELS = [
-  { id: "gemini-1.5-flash", label: "Gemini 1.5 Flash (Direkomendasikan - Paling Stabil)" },
+  { id: "gemini-1.5-flash", label: "Gemini 1.5 Flash (Resmi & Paling Stabil)" },
   { id: "gemini-2.0-flash", label: "Gemini 2.0 Flash (Generasi Baru - Super Cepat)" },
-  { id: "gemini-1.5-flash-8b", label: "Gemini 1.5 Flash-8B (Model Ringan Vision & OCR)" },
-  { id: "gemini-2.0-flash-lite", label: "Gemini 2.0 Flash-Lite (Super Ringan)" },
 ];
 
 export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {

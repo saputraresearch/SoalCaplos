@@ -18,7 +18,7 @@ export function normalizeModelName(model?: string | null): string {
   ) {
     return "gemini-2.0-flash";
   }
-  const valid = ["gemini-1.5-flash", "gemini-2.0-flash", "gemini-1.5-flash-8b"];
+  const valid = ["gemini-1.5-flash", "gemini-2.0-flash"];
   if (!valid.includes(clean)) {
     return "gemini-1.5-flash";
   }
@@ -94,7 +94,6 @@ export async function getActiveGeminiModels(
     normalizedPreferred,
     "gemini-1.5-flash",
     "gemini-2.0-flash",
-    "gemini-1.5-flash-8b",
   ].filter(Boolean) as string[];
 
   return Array.from(new Set(fallback));

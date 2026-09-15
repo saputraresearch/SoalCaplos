@@ -562,7 +562,7 @@ export default function CreateQuizPage() {
             <span>Create Quiz from PDF OCR</span>
           </h1>
           <p className="text-slate-600 mt-1">
-            Upload a scanned exam PDF. Gemini Vision will transcribe the questions and prepare an interactive quiz.
+            Upload file PDF soal ujian. AI (Groq Cloud / Google Gemini) akan mengekstrak butir soal dan menyiapkan kuis interaktif.
           </p>
         </div>
 
@@ -587,7 +587,7 @@ export default function CreateQuizPage() {
             className="px-3.5 py-2 rounded-xl bg-slate-100 text-slate-700 font-semibold text-xs flex items-center gap-1.5 hover:bg-slate-200 transition shrink-0"
           >
             <Key className="w-4 h-4 text-indigo-600" />
-            <span>Set Gemini API Key</span>
+            <span>Pengaturan AI (Groq / Gemini)</span>
           </button>
         </div>
       </div>
@@ -815,12 +815,12 @@ export default function CreateQuizPage() {
                 {isParsing ? (
                   <>
                     <Loader2 className="w-5 h-5 animate-spin" />
-                    <span>Parsing PDF with Gemini Vision OCR...</span>
+                    <span>Mengekstrak Soal dengan AI...</span>
                   </>
                 ) : (
                   <>
                     <FileText className="w-5 h-5" />
-                    <span>Start OCR Question Extraction</span>
+                    <span>Mulai Ekstraksi Soal PDF</span>
                   </>
                 )}
               </button>

@@ -9,7 +9,32 @@ export async function extractPdfDigitalText(pdfBuffer: Buffer): Promise<{
   pageCount: number;
   pageTexts: Array<{ pageNumber: number; text: string }>;
 }> {
-  // Method 1: Try pdfjs-dist legacy build for Node.js
+  // Method 1: Try pdf-parse (Rock-solid, zero-dependency Node.js standard)
+  try {
+    // @ts-ignore
+    const pdfParse = (await import("pdf-parse")).default || (await import("pdf-parse"));
+    if (typeof pdfParse === "function") {
+      const data = await pdfParse(pdfBuffer);
+      if (data && typeof data.text === "string") {
+        const trimmed = data.text.trim();
+        const cleanChars = trimmed.replace(/[^a-zA-Z0-9]/g, "");
+        if (cleanChars.length >= 30) {
+          console.log(`[pdfTextExtractor] pdf-parse successfully extracted ${trimmed.length} chars across ${data.numpages || 1} pages.`);
+          return {
+            hasDigitalText: true,
+            fullText: trimmed,
+            charCount: trimmed.length,
+            pageCount: data.numpages || 1,
+            pageTexts: [{ pageNumber: 1, text: trimmed }],
+          };
+        }
+      }
+    }
+  } catch (pdfParseErr) {
+    console.warn("[pdfTextExtractor] pdf-parse attempt failed or unavailable:", pdfParseErr);
+  }
+
+  // Method 2: Try pdfjs-dist legacy build for Node.js
   try {
     // @ts-ignore
     let pdfjs = (await import("pdfjs-dist/legacy/build/pdf.js")) as any;

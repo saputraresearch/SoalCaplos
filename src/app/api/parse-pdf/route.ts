@@ -74,8 +74,8 @@ export async function POST(req: NextRequest) {
 
     const requestedModel = (req.headers.get("x-gemini-model") || (formData.get("model") as string | null))?.trim();
     const preferredProvider = (req.headers.get("x-ai-provider") || (formData.get("ai_provider") as string | null) || (groqApiKey && apiKeys.length === 0 ? "groq" : "auto"))?.toLowerCase();
-    // Prioritize high-throughput flash models with universal free tier availability
-    const candidateList = [requestedModel, "gemini-1.5-flash", "gemini-2.0-flash", "gemini-1.5-flash-8b"].filter(Boolean) as string[];
+    // Prioritize official high-throughput flash models
+    const candidateList = [requestedModel, "gemini-1.5-flash", "gemini-2.0-flash"].filter(Boolean) as string[];
     const modelsToTry = Array.from(new Set(candidateList.map((m) => normalizeModelName(m))));
     console.log(`[parse-pdf] Provider preference: ${preferredProvider}, Candidate models:`, modelsToTry, `(Active Gemini keys: ${apiKeys.length}, Groq key: ${!!groqApiKey})`);
 

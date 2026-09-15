@@ -13,7 +13,7 @@ export async function extractScannedPdfWithOcrSpace(
     const form = new FormData();
     form.append("apikey", key);
     form.append("isOverlayRequired", "false");
-    form.append("OCREngine", "2"); // Engine 2 is optimized for numbers, English & Latin characters
+    form.append("OCREngine", "1"); // Engine 1 supports multi-page PDFs on all plans
     form.append("detectOrientation", "true");
     form.append("scale", "true");
 

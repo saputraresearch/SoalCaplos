@@ -9,7 +9,7 @@ const nextConfig = {
     ],
   },
   experimental: {
-    serverComponentsExternalPackages: ['pdf-img-convert', 'sharp', 'pdfjs-dist'],
+    serverComponentsExternalPackages: ['pdf-img-convert', 'sharp', 'pdfjs-dist', 'pdf-parse'],
   },
 };
 
