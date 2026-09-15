@@ -21,6 +21,7 @@ import EditQuestionModal from "@/components/EditQuestionModal";
 import AddQuestionMenu from "@/components/AddQuestionMenu";
 import AiGenerateModal from "@/components/AiGenerateModal";
 import { createDefaultQuestion } from "@/lib/questionTemplates";
+import { safeParseResponseJson } from "@/lib/apiResponse";
 
 export default function EditQuizPage() {
   const params = useParams();
@@ -72,14 +73,14 @@ export default function EditQuizPage() {
       try {
         setLoading(true);
         const res = await fetch(`/api/quizzes/${quizId}`);
-        const data = await res.json();
+        const parsedRes = await safeParseResponseJson(res);
 
-        if (res.ok && data.quiz) {
-          setQuiz(data.quiz);
-          setQuizTitle(data.quiz.title);
-          setQuestions(data.questions || []);
+        if (parsedRes.ok && parsedRes.data?.quiz) {
+          setQuiz(parsedRes.data.quiz);
+          setQuizTitle(parsedRes.data.quiz.title);
+          setQuestions(parsedRes.data.questions || []);
         } else {
-          alert("Quiz not found.");
+          alert(parsedRes.error || "Quiz not found.");
           router.push("/admin/quizzes");
         }
       } catch {
@@ -185,10 +186,11 @@ export default function EditQuizPage() {
         }),
       });
 
-      const data = await res.json();
-      if (!res.ok || data.error) {
-        throw new Error(data.error || "Failed to save draft.");
+      const parsedRes = await safeParseResponseJson(res);
+      if (!parsedRes.ok || !parsedRes.data) {
+        throw new Error(parsedRes.error || "Failed to save draft.");
       }
+      const data = parsedRes.data;
 
       const timeStr = new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
       setLastSavedTime(timeStr);
@@ -236,10 +238,11 @@ export default function EditQuizPage() {
         }),
       });
 
-      const data = await res.json();
-      if (!res.ok || data.error) {
-        throw new Error(data.error || "Failed to publish quiz.");
+      const parsedRes = await safeParseResponseJson(res);
+      if (!parsedRes.ok || !parsedRes.data) {
+        throw new Error(parsedRes.error || "Failed to publish quiz.");
       }
+      const data = parsedRes.data;
 
       const timeStr = new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
       setLastSavedTime(timeStr);

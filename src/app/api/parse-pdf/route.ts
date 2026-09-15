@@ -43,12 +43,24 @@ export async function POST(req: NextRequest) {
     dns.setDefaultResultOrder("ipv4first");
 
     const pdfBuffer = Buffer.from(arrayBuffer);
+
+    if (pdfBuffer.length > 4.5 * 1024 * 1024) {
+      return NextResponse.json(
+        {
+          error: `Ukuran file PDF (${(pdfBuffer.length / (1024 * 1024)).toFixed(1)} MB) melebihi batas 4.5 MB serverless. Silakan kompres PDF Anda terlebih dahulu.`,
+        },
+        { status: 413 }
+      );
+    }
+
     const base64Data = pdfBuffer.toString("base64");
 
     const genAI = new GoogleGenerativeAI(apiKey.trim());
 
     const requestedModel = (req.headers.get("x-gemini-model") || (formData.get("model") as string | null))?.trim();
-    const modelsToTry = await getActiveGeminiModels(apiKey, requestedModel);
+    const allModels = await getActiveGeminiModels(apiKey, requestedModel);
+    // Limit to top 2 candidate models to stay well within serverless execution budget
+    const modelsToTry = allModels.slice(0, 2);
     console.log(`[parse-pdf] Selected models to try:`, modelsToTry);
 
     const systemPrompt = `Act strictly as an expert document transcriber, question type detector, and diagram analyzer. Extract the existing questions, options, and diagram/image information from the uploaded PDF document exactly as written. Return structured JSON matching the quiz schema. Do not generate or invent new questions.

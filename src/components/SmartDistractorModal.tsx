@@ -12,6 +12,7 @@ import {
   Lightbulb,
 } from "lucide-react";
 import { GeneratedOption, DistractorResponse } from "@/app/api/generate-distractors/route";
+import { safeParseResponseJson } from "@/lib/apiResponse";
 
 interface SmartDistractorModalProps {
   isOpen: boolean;
@@ -94,10 +95,11 @@ export default function SmartDistractorModal({
         }),
       });
 
-      const data: DistractorResponse & { error?: string } = await res.json();
-      if (!res.ok || data.error) {
-        throw new Error(data.error || "Gagal membuat pengecoh otomatis.");
+      const parsedRes = await safeParseResponseJson<DistractorResponse>(res);
+      if (!parsedRes.ok || !parsedRes.data) {
+        throw new Error(parsedRes.error || "Gagal membuat pengecoh otomatis.");
       }
+      const data = parsedRes.data;
 
       if (Array.isArray(data.generated_options)) {
         setGeneratedOptions(data.generated_options);

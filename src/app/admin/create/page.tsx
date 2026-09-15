@@ -30,6 +30,7 @@ import EditQuestionModal from "@/components/EditQuestionModal";
 import AddQuestionMenu from "@/components/AddQuestionMenu";
 import { createDefaultQuestion } from "@/lib/questionTemplates";
 import { reportClientError } from "@/components/ErrorTelemetry";
+import { safeParseResponseJson } from "@/lib/apiResponse";
 
 export default function CreateQuizPage() {
   const router = useRouter();
@@ -130,7 +131,14 @@ export default function CreateQuizPage() {
   // File selection handler
   const handleFileSelect = (selectedFile: File) => {
     if (selectedFile.type !== "application/pdf") {
-      setParseError("Please select a valid PDF file.");
+      setParseError("Silakan pilih berkas PDF yang valid.");
+      return;
+    }
+    // Check file size (max 4.5 MB on Vercel Serverless)
+    if (selectedFile.size > 4.5 * 1024 * 1024) {
+      setParseError(
+        `Ukuran file PDF terlalu besar (${(selectedFile.size / (1024 * 1024)).toFixed(1)} MB). Batas maksimum serverless adalah 4.5 MB untuk mencegah server timeout. Silakan kompres atau perkecil PDF Anda terlebih dahulu.`
+      );
       return;
     }
     setFile(selectedFile);
@@ -150,11 +158,34 @@ export default function CreateQuizPage() {
   const handleParsePDF = async () => {
     if (!file) return;
 
+    if (file.size > 4.5 * 1024 * 1024) {
+      setParseError(
+        `Ukuran file PDF (${(file.size / (1024 * 1024)).toFixed(1)} MB) melebihi batas 4.5 MB serverless. Silakan kompres PDF terlebih dahulu.`
+      );
+      return;
+    }
+
     setIsParsing(true);
     setParseError(null);
 
     const customApiKey = typeof window !== "undefined" ? localStorage.getItem("quizcaplos_gemini_api_key") || "" : "";
-    const customModel = typeof window !== "undefined" ? localStorage.getItem("quizcaplos_gemini_model") || "gemini-3.6-flash" : "gemini-3.6-flash";
+    let customModel = typeof window !== "undefined" ? localStorage.getItem("quizcaplos_gemini_model") || "gemini-2.0-flash" : "gemini-2.0-flash";
+    if (
+      customModel.includes("3.6") ||
+      customModel.includes("2.5") ||
+      customModel.includes("exp") ||
+      customModel === "gemini-3.6-flash" ||
+      customModel === "gemini-2.5-flash" ||
+      customModel === "gemini-2.5-pro" ||
+      customModel === "gemini-2.0-flash-exp" ||
+      customModel === "gemini-1.5-flash-latest" ||
+      customModel === "gemini-1.5-pro-latest"
+    ) {
+      customModel = "gemini-2.0-flash";
+      if (typeof window !== "undefined") {
+        localStorage.setItem("quizcaplos_gemini_model", "gemini-2.0-flash");
+      }
+    }
 
     const formData = new FormData();
     formData.append("file", file);
@@ -180,14 +211,21 @@ export default function CreateQuizPage() {
         body: formData,
       });
 
-      const data = await res.json();
+      const parsedResult = await safeParseResponseJson(res);
 
-      if (!res.ok || data.error) {
-        if (data.error?.includes("API Key is missing") || data.error?.includes("GEMINI_API_KEY")) {
+      if (!parsedResult.ok || !parsedResult.data) {
+        const errorText = parsedResult.error || "Gagal memproses dokumen PDF.";
+        if (
+          errorText.includes("API Key is missing") ||
+          errorText.includes("GEMINI_API_KEY") ||
+          errorText.includes("API Key Gemini Anda tidak valid")
+        ) {
           setIsSettingsOpen(true);
         }
-        throw new Error(data.error || "Failed to parse PDF document.");
+        throw new Error(errorText);
       }
+
+      const data = parsedResult.data;
 
       setQuizTitle(data.title || file.name.replace(/\.[^/.]+$/, ""));
       const extractedQuestions = data.questions || [];
@@ -362,10 +400,11 @@ export default function CreateQuizPage() {
         });
       }
 
-      const data = await res.json();
-      if (!res.ok || data.error) {
-        throw new Error(data.error || "Failed to save draft.");
+      const parsedRes = await safeParseResponseJson(res);
+      if (!parsedRes.ok || !parsedRes.data) {
+        throw new Error(parsedRes.error || "Failed to save draft.");
       }
+      const data = parsedRes.data;
 
       if (data.quiz?.id) {
         setCreatedQuizId(data.quiz.id);
@@ -429,11 +468,11 @@ export default function CreateQuizPage() {
         });
       }
 
-      const data = await res.json();
-
-      if (!res.ok || data.error) {
-        throw new Error(data.error || "Failed to publish quiz.");
+      const parsedRes = await safeParseResponseJson(res);
+      if (!parsedRes.ok || !parsedRes.data) {
+        throw new Error(parsedRes.error || "Failed to publish quiz.");
       }
+      const data = parsedRes.data;
 
       if (data.quiz?.id) {
         setCreatedQuizId(data.quiz.id);

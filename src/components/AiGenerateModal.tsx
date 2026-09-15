@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Sparkles, X, Loader2, CheckSquare } from "lucide-react";
 import { ParsedQuestion, QuestionType } from "@/lib/types";
+import { safeParseResponseJson } from "@/lib/apiResponse";
 
 interface AiGenerateModalProps {
   isOpen: boolean;
@@ -87,10 +88,11 @@ export default function AiGenerateModal({ isOpen, onClose, onGenerated }: AiGene
         }),
       });
 
-      const data = await res.json();
-      if (!res.ok || data.error) {
-        throw new Error(data.error || "Gagal membuat soal dengan AI.");
+      const parsedRes = await safeParseResponseJson(res);
+      if (!parsedRes.ok || !parsedRes.data) {
+        throw new Error(parsedRes.error || "Gagal membuat soal dengan AI.");
       }
+      const data = parsedRes.data;
 
       onGenerated(data.questions || [], data.title);
       onClose();
