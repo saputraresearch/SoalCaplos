@@ -1,0 +1,14 @@
+src/app/api/generate-quiz/route.ts
+  h_7310902349a227 50,52
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "8c6ff5538082ac9fafe26d2408be1e141c4a9979",
+  "prompts": {},
+  "humans": {
+    "h_7310902349a227": {
+      "author": "saputra.a.pratama <saputra.a.pratama@gdn-commerce.com>"
+    }
+  }
+}
