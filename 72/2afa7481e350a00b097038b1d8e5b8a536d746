@@ -1,0 +1,16 @@
+src/app/api/parse-pdf/route.ts
+  h_7310902349a227 37,39
+src/components/SettingsModal.tsx
+  h_7310902349a227 4,19-21,28-31,53-54,68,77,81-99,101-107,110,113-114,116-117,121-124,127-135,140,142,156,161-162,169,179,188,193
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "722afa7481e350a00b097038b1d8e5b8a536d746",
+  "prompts": {},
+  "humans": {
+    "h_7310902349a227": {
+      "author": "saputra.a.pratama <saputra.a.pratama@gdn-commerce.com>"
+    }
+  }
+}
