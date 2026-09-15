@@ -1,0 +1,19 @@
+src/app/api/parse-pdf/route.ts
+  s_ee6ebcaf9060b9::t_e1a6759abe8833 401-404
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "d133972a0e153e268dd0f116623221b4eba4abac",
+  "prompts": {},
+  "sessions": {
+    "s_ee6ebcaf9060b9": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "fe3db708-c94c-45c4-bfe5-95e64caebf8d",
+        "model": "claude-sonnet-5"
+      },
+      "human_author": "saputra.a.pratama <saputra.a.pratama@gdn-commerce.com>"
+    }
+  }
+}
