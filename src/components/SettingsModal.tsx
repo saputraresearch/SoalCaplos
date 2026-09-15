@@ -79,19 +79,24 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
 
         {/* API Key Field */}
         <div className="space-y-1.5">
-          <label className="block text-xs font-bold uppercase tracking-wider text-slate-600">
-            Your Gemini API Key
-          </label>
+          <div className="flex items-center justify-between">
+            <label className="block text-xs font-bold uppercase tracking-wider text-slate-600">
+              Gemini API Key
+            </label>
+            <span className="text-[10px] text-indigo-600 font-bold bg-indigo-50 px-2 py-0.5 rounded-md">
+              Bisa 2+ Key Cadangan
+            </span>
+          </div>
           <input
             type="password"
             value={apiKey}
             onChange={(e) => setApiKey(e.target.value)}
-            placeholder="AIzaSy..."
+            placeholder="AIzaSy... (bisa masukkan beberapa key dipisah koma)"
             className="w-full px-4 py-2.5 rounded-xl border border-slate-300 text-sm font-mono focus:ring-2 focus:ring-indigo-500 focus:outline-hidden"
           />
           <p className="text-xs text-slate-500 flex items-center gap-1 pt-0.5">
             <ShieldCheck className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
-            <span>Saved in your browser (localStorage).</span>
+            <span>Tersimpan di browser. Masukkan key cadangan (pisah koma) untuk otomatis berpindah saat limit tercapai.</span>
           </p>
         </div>
 

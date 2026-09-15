@@ -20,9 +20,9 @@ export async function POST(req: NextRequest) {
     const formKey = formData.get("api_key") as string | null;
     const envKey = process.env.GEMINI_API_KEY;
 
-    const apiKey = headerKey || formKey || (envKey !== "your-gemini-api-key" ? envKey : null);
+    const rawApiKey = headerKey || formKey || (envKey !== "your-gemini-api-key" ? envKey : null);
 
-    if (!apiKey) {
+    if (!rawApiKey) {
       return NextResponse.json(
         {
           error:
@@ -30,6 +30,15 @@ export async function POST(req: NextRequest) {
         },
         { status: 400 }
       );
+    }
+
+    const apiKeys = rawApiKey
+      .split(/[,\n;]+/)
+      .map((k) => k.trim())
+      .filter((k) => k.length > 5);
+
+    if (apiKeys.length === 0) {
+      return NextResponse.json({ error: "Gemini API Key is invalid or empty." }, { status: 400 });
     }
 
     const file = formData.get("file") as File | null;
@@ -55,13 +64,11 @@ export async function POST(req: NextRequest) {
 
     const base64Data = pdfBuffer.toString("base64");
 
-    const genAI = new GoogleGenerativeAI(apiKey.trim());
-
     const requestedModel = (req.headers.get("x-gemini-model") || (formData.get("model") as string | null))?.trim();
-    const allModels = await getActiveGeminiModels(apiKey, requestedModel);
+    const allModels = await getActiveGeminiModels(apiKeys[0], requestedModel);
     // Limit to top 2 candidate models to stay well within serverless execution budget
     const modelsToTry = allModels.slice(0, 2);
-    console.log(`[parse-pdf] Selected models to try:`, modelsToTry);
+    console.log(`[parse-pdf] Selected models to try:`, modelsToTry, `(Active keys: ${apiKeys.length})`);
 
     const systemPrompt = `Act strictly as an expert document transcriber, question type detector, and diagram analyzer. Extract the existing questions, options, and diagram/image information from the uploaded PDF document exactly as written. Return structured JSON matching the quiz schema. Do not generate or invent new questions.
 
@@ -151,30 +158,46 @@ PANDUAN DETEKSI GAMBAR (DIAGRAM SOAL & GAMBAR OPSI):
     let responseText: string | null = null;
     let lastError: Error | null = null;
     let successfulModel = "";
+    let successfulKeyIndex = 0;
 
-    for (const modelName of modelsToTry) {
-      try {
-        console.log(`Attempting OCR extraction with Gemini model: ${modelName}`);
-        const model = genAI.getGenerativeModel({
-          model: modelName,
-          generationConfig: { responseMimeType: "application/json" },
-        });
+    keyLoop: for (let keyIdx = 0; keyIdx < apiKeys.length; keyIdx++) {
+      const currentApiKey = apiKeys[keyIdx];
+      const genAI = new GoogleGenerativeAI(currentApiKey);
 
-        const result = await model.generateContent(promptParts);
-        responseText = result.response.text();
-        if (responseText) {
-          successfulModel = modelName;
-          console.log(`OCR extraction succeeded with model: ${modelName}`);
-          break;
-        }
-      } catch (err: unknown) {
-        const errorMsg = err instanceof Error ? err.message : String(err);
-        console.warn(`Model ${modelName} failed (${errorMsg}), trying next fallback...`);
-        lastError = err instanceof Error ? err : new Error(errorMsg);
+      for (const modelName of modelsToTry) {
+        try {
+          console.log(`Attempting OCR extraction with key #${keyIdx + 1} and model: ${modelName}`);
+          const model = genAI.getGenerativeModel({
+            model: modelName,
+            generationConfig: { responseMimeType: "application/json" },
+          });
 
-        // If it's a network/connection failure, pause briefly before retrying
-        if (errorMsg.includes("fetch failed") || errorMsg.includes("ENOTFOUND") || errorMsg.includes("ETIMEDOUT")) {
-          await new Promise((r) => setTimeout(r, 600));
+          const result = await model.generateContent(promptParts);
+          responseText = result.response.text();
+          if (responseText) {
+            successfulModel = modelName;
+            successfulKeyIndex = keyIdx;
+            console.log(`OCR extraction succeeded with key #${keyIdx + 1} and model: ${modelName}`);
+            break keyLoop;
+          }
+        } catch (err: unknown) {
+          const errorMsg = err instanceof Error ? err.message : String(err);
+          console.warn(`Key #${keyIdx + 1} model ${modelName} failed (${errorMsg})`);
+          lastError = err instanceof Error ? err : new Error(errorMsg);
+
+          // If quota exhausted (429) and there is a backup key, rotate to next key immediately
+          if (
+            (errorMsg.includes("RESOURCE_EXHAUSTED") || errorMsg.includes("429") || errorMsg.includes("quota")) &&
+            keyIdx < apiKeys.length - 1
+          ) {
+            console.warn(`Key #${keyIdx + 1} hit quota limit, rotating to backup key #${keyIdx + 2}...`);
+            break; // breaks out of model loop and advances to next key!
+          }
+
+          // If it's a network/connection failure, pause briefly before retrying
+          if (errorMsg.includes("fetch failed") || errorMsg.includes("ENOTFOUND") || errorMsg.includes("ETIMEDOUT")) {
+            await new Promise((r) => setTimeout(r, 600));
+          }
         }
       }
     }
@@ -248,7 +271,7 @@ PANDUAN DETEKSI GAMBAR (DIAGRAM SOAL & GAMBAR OPSI):
     if (rawError.includes("API_KEY_INVALID") || rawError.includes("API key not valid") || rawError.includes("400")) {
       userFriendlyError = "API Key Gemini Anda tidak valid. Silakan periksa kembali dan masukkan API Key yang benar melalui menu Pengaturan (ikon gerigi di kanan atas).";
     } else if (rawError.includes("RESOURCE_EXHAUSTED") || rawError.includes("429") || rawError.includes("quota")) {
-      userFriendlyError = "Batas kuota gratis (rate limit / quota) Gemini API Anda telah tercapai. Silakan tunggu 1-2 menit sebelum mencoba lagi, atau gunakan API Key Gemini lainnya.";
+      userFriendlyError = "Batas kuota gratis (rate limit / quota) Gemini API Anda telah tercapai. Kuota Google dihitung per API Key / Project (maks 15 request per menit). Silakan tunggu 1-2 menit lalu klik 'Coba Ekstrak Ulang', atau tambahkan API Key cadangan di menu Pengaturan.";
     } else if (rawError.includes("fetch failed") || rawError.includes("ENOTFOUND") || rawError.includes("ETIMEDOUT") || rawError.includes("ECONNRESET")) {
       userFriendlyError = "Gagal terhubung ke Google Gemini API (koneksi jaringan terputus / fetch failed). Pastikan perangkat Anda terhubung ke internet dan API Key di menu Pengaturan sudah aktif.";
     } else if (rawError.includes("SAFETY") || rawError.includes("blocked")) {

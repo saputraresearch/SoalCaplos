@@ -34,9 +34,9 @@ export async function POST(req: NextRequest) {
     // Check for API key
     const headerKey = req.headers.get("x-gemini-api-key");
     const envKey = process.env.GEMINI_API_KEY;
-    const apiKey = headerKey || (envKey !== "your-gemini-api-key" ? envKey : null);
+    const rawApiKey = headerKey || (envKey !== "your-gemini-api-key" ? envKey : null);
 
-    if (!apiKey) {
+    if (!rawApiKey) {
       return NextResponse.json(
         {
           error:
@@ -46,13 +46,22 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    const apiKeys = rawApiKey
+      .split(/[,\n;]+/)
+      .map((k) => k.trim())
+      .filter((k) => k.length > 5);
+
+    if (apiKeys.length === 0) {
+      return NextResponse.json({ error: "Gemini API Key is invalid or empty." }, { status: 400 });
+    }
+
     // Ensure Node.js resolves IPv4 first on every request
     dns.setDefaultResultOrder("ipv4first");
 
-    const genAI = new GoogleGenerativeAI(apiKey.trim());
     const requestedModel = req.headers.get("x-gemini-model")?.trim();
-    const modelsToTry = await getActiveGeminiModels(apiKey, requestedModel);
-    console.log(`[generate-quiz] Selected models to try:`, modelsToTry);
+    const allModels = await getActiveGeminiModels(apiKeys[0], requestedModel);
+    const modelsToTry = allModels.slice(0, 2);
+    console.log(`[generate-quiz] Selected models to try:`, modelsToTry, `(Active keys: ${apiKeys.length})`);
 
     const selectedTypesText = types && types.length > 0
       ? `Buat soal yang berfokus pada tipe berikut: ${types.join(", ")}.`
@@ -155,21 +164,34 @@ Patuhi target usia dan tingkat kesulitan yang diinput. Gunakan Bahasa Indonesia 
     let responseText: string | null = null;
     let lastError: Error | null = null;
 
-    for (const modelName of modelsToTry) {
-      try {
-        console.log(`Generating 8-type quiz with Gemini model: ${modelName}`);
-        const model = genAI.getGenerativeModel({
-          model: modelName,
-          generationConfig: { responseMimeType: "application/json" },
-        });
+    keyLoop: for (let keyIdx = 0; keyIdx < apiKeys.length; keyIdx++) {
+      const currentApiKey = apiKeys[keyIdx];
+      const genAI = new GoogleGenerativeAI(currentApiKey);
 
-        const result = await model.generateContent(systemPrompt);
-        const response = await result.response;
-        responseText = response.text();
-        if (responseText) break;
-      } catch (err: any) {
-        lastError = err instanceof Error ? err : new Error(String(err));
-        console.warn(`Model ${modelName} failed, attempting fallback:`, lastError.message, err?.cause);
+      for (const modelName of modelsToTry) {
+        try {
+          console.log(`Generating quiz with key #${keyIdx + 1} and Gemini model: ${modelName}`);
+          const model = genAI.getGenerativeModel({
+            model: modelName,
+            generationConfig: { responseMimeType: "application/json" },
+          });
+
+          const result = await model.generateContent(systemPrompt);
+          const response = await result.response;
+          responseText = response.text();
+          if (responseText) break keyLoop;
+        } catch (err: any) {
+          lastError = err instanceof Error ? err : new Error(String(err));
+          console.warn(`Key #${keyIdx + 1} model ${modelName} failed:`, lastError.message);
+
+          if (
+            (lastError.message.includes("RESOURCE_EXHAUSTED") || lastError.message.includes("429") || lastError.message.includes("quota")) &&
+            keyIdx < apiKeys.length - 1
+          ) {
+            console.warn(`Key #${keyIdx + 1} quota limit hit, switching to backup key #${keyIdx + 2}...`);
+            break;
+          }
+        }
       }
     }
 
