@@ -1,0 +1,16 @@
+src/app/admin/create/page.tsx
+  h_7310902349a227 59-65,277-278,292-301,367-368,390-397,778-848
+src/lib/clientAiExtractor.ts
+  h_7310902349a227 7-8,10-21,23-26,28-29,31-32,34,36-37,39,41,44,54-55,74-122,125,146,150-151,199,202-203,229-230,266-276,280,282-293,298,302,311,316,319-332,337,339,364,366-375,380,384
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "45d0f9b45e085654bbedc8bb5b831fc3a28fce5d",
+  "prompts": {},
+  "humans": {
+    "h_7310902349a227": {
+      "author": "saputra.a.pratama <saputra.a.pratama@gdn-commerce.com>"
+    }
+  }
+}
