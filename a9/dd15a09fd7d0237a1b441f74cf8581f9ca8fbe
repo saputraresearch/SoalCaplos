@@ -1,0 +1,18 @@
+src/app/admin/create/page.tsx
+  h_7310902349a227 35,227-299
+src/app/api/extract-text/route.ts
+  h_7310902349a227 1-123
+src/lib/clientAiExtractor.ts
+  h_7310902349a227 1-297
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "a9dd15a09fd7d0237a1b441f74cf8581f9ca8fbe",
+  "prompts": {},
+  "humans": {
+    "h_7310902349a227": {
+      "author": "saputra.a.pratama <saputra.a.pratama@gdn-commerce.com>"
+    }
+  }
+}
