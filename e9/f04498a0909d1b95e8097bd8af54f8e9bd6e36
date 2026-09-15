@@ -1,0 +1,27 @@
+src/app/admin/create/page.tsx
+  s_ee6ebcaf9060b9::t_cbeae57159dc6b 199,212-214,227-229
+src/app/api/parse-pdf/route.ts
+  s_ee6ebcaf9060b9::t_c277c9774ba726 7,25-28,35,39,45-49,273-288
+src/components/AiGenerateModal.tsx
+  s_ee6ebcaf9060b9::t_2ccf77f3ab7be5 73,78
+src/components/SettingsModal.tsx
+  s_ee6ebcaf9060b9::t_3d69ca3a33ff94 4,12-14,21,33,44-45,58,165-196
+src/lib/groqClient.ts
+  s_ee6ebcaf9060b9::t_d547f631a1e1b7 1-153
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "e9f04498a0909d1b95e8097bd8af54f8e9bd6e36",
+  "prompts": {},
+  "sessions": {
+    "s_ee6ebcaf9060b9": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "fe3db708-c94c-45c4-bfe5-95e64caebf8d",
+        "model": "claude-sonnet-5"
+      },
+      "human_author": "saputra.a.pratama <saputra.a.pratama@gdn-commerce.com>"
+    }
+  }
+}
