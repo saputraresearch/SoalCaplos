@@ -1,75 +1,198 @@
 import Link from "next/link";
-import { Sparkles, Upload, Play, BarChart, CheckCircle2, Zap } from "lucide-react";
+import { Sparkles, Upload, Play, BarChart3, CheckCircle2, Zap, BrainCircuit, BookOpen, Layers } from "lucide-react";
 
 export default function Home() {
   return (
-    <div className="space-y-12 py-6">
+    <div className="space-y-16 py-6 sm:py-10">
       {/* Hero Section */}
-      <section className="text-center space-y-6 max-w-3xl mx-auto pt-6">
-        <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-indigo-50 border border-indigo-100 text-indigo-700 text-sm font-semibold shadow-xs">
-          <Sparkles className="w-4 h-4 text-indigo-500 animate-pulse" />
-          <span>AI Vision OCR Powered Question Generator</span>
-        </div>
-        
-        <h1 className="text-4xl sm:text-5xl font-black text-slate-900 tracking-tight leading-tight">
-          Turn Scanned PDF Exams into <br className="hidden sm:inline" />
-          <span className="bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 bg-clip-text text-transparent">
-            Interactive Quizizz Quizzes
-          </span>
-        </h1>
-        
-        <p className="text-lg text-slate-600 leading-relaxed max-w-2xl mx-auto">
-          Upload any scanned PDF test sheet. Our Gemini Flash Vision pipeline transcribes questions, extracts diagram figures, and generates an engaging, asynchronous quiz experience for your students.
-        </p>
+      <section className="bg-gradient-to-b from-white via-caplos-blue-50/40 to-white rounded-3xl p-6 sm:p-10 border border-slate-200/80 shadow-xs">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-center">
+          {/* Left Column: Copy & CTAs */}
+          <div className="lg:col-span-7 space-y-6 text-center lg:text-left">
+            <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-caplos-yellow/20 border border-caplos-yellow text-caplos-navy text-xs font-bold shadow-xs">
+              <Sparkles className="w-4 h-4 text-caplos-yellow-700" />
+              <span>AI Multimodal Quiz Generator & Interactive Runner</span>
+            </div>
 
-        <div className="flex flex-col sm:flex-row items-center justify-center gap-4 pt-2">
-          <Link
-            href="/admin/create"
-            className="w-full sm:w-auto px-6 py-3.5 rounded-xl bg-indigo-600 text-white font-semibold shadow-lg shadow-indigo-200 hover:bg-indigo-700 hover:shadow-xl transition flex items-center justify-center gap-2"
-          >
-            <Upload className="w-5 h-5" />
-            <span>Upload PDF & Create Quiz</span>
-          </Link>
-          <Link
-            href="/admin/quizzes"
-            className="w-full sm:w-auto px-6 py-3.5 rounded-xl bg-white border border-slate-300 text-slate-700 font-semibold shadow-xs hover:bg-slate-50 transition flex items-center justify-center gap-2"
-          >
-            <BarChart className="w-5 h-5 text-slate-500" />
-            <span>View Quiz Dashboard</span>
-          </Link>
+            <div className="space-y-3">
+              <h1 className="text-4xl sm:text-5xl font-black text-caplos-navy tracking-tight leading-tight">
+                Bikin Soal Kuis Cerdas dari PDF,{" "}
+                <span className="text-caplos-blue underline decoration-caplos-yellow decoration-wavy decoration-3">
+                  Menyenangkan
+                </span>{" "}
+                bagi Siswa!
+              </h1>
+              <p className="text-lg sm:text-xl font-bold text-caplos-blue">
+                Create, Analyze & Personalize Learning Questions
+              </p>
+            </div>
+
+            <p className="text-base text-caplos-navy-600 leading-relaxed max-w-xl mx-auto lg:mx-0 font-normal">
+              Cukup unggah lembar PDF ujian sekolah Anda. AI Caplos otomatis mengekstrak butir soal, 
+              memotong diagram visual & pilihan gambar, serta menyajikannya ke dalam 11 jenis latihan interaktif ramah anak.
+            </p>
+
+            <div className="flex flex-col sm:flex-row items-center justify-center lg:justify-start gap-3.5 pt-2">
+              <Link
+                href="/admin/create"
+                className="w-full sm:w-auto px-7 py-4 rounded-2xl bg-caplos-blue text-white font-bold shadow-lg shadow-caplos-blue/30 hover:bg-caplos-blue-600 hover:shadow-xl transition flex items-center justify-center gap-2.5 text-base cursor-pointer"
+              >
+                <Upload className="w-5 h-5 text-caplos-yellow" />
+                <span>Unggah PDF & Buat Soal</span>
+              </Link>
+
+              <Link
+                href="/quiz/demo"
+                className="w-full sm:w-auto px-6 py-4 rounded-2xl bg-white border-2 border-caplos-navy text-caplos-navy font-bold shadow-xs hover:bg-caplos-yellow/10 transition flex items-center justify-center gap-2 text-base cursor-pointer"
+              >
+                <Play className="w-5 h-5 text-caplos-blue" />
+                <span>Coba Demo Siswa</span>
+              </Link>
+            </div>
+
+            {/* Micro highlights */}
+            <div className="pt-2 flex flex-wrap items-center justify-center lg:justify-start gap-4 text-xs font-semibold text-caplos-navy-600">
+              <span className="flex items-center gap-1.5">
+                <CheckCircle2 className="w-4 h-4 text-emerald-500" /> Auto-Potong Diagram PDF
+              </span>
+              <span className="flex items-center gap-1.5">
+                <CheckCircle2 className="w-4 h-4 text-caplos-yellow-700" /> 11 Tipe Soal Interaktif
+              </span>
+              <span className="flex items-center gap-1.5">
+                <CheckCircle2 className="w-4 h-4 text-caplos-blue" /> Ramah Siswa SD
+              </span>
+            </div>
+          </div>
+
+          {/* Right Column: Mascot Card */}
+          <div className="lg:col-span-5 flex justify-center">
+            <div className="relative group">
+              {/* Outer decorative ring */}
+              <div className="absolute -inset-2 bg-gradient-to-tr from-caplos-blue via-caplos-yellow to-caplos-navy rounded-3xl opacity-30 blur-md group-hover:opacity-50 transition duration-500" />
+              
+              <div className="relative bg-white p-4 sm:p-5 rounded-3xl border-2 border-caplos-blue-100 shadow-xl max-w-sm flex flex-col items-center text-center space-y-4">
+                <div className="w-64 h-64 sm:w-72 sm:h-72 rounded-2xl overflow-hidden bg-gradient-to-b from-caplos-blue-50 to-white flex items-center justify-center border border-caplos-yellow/40 shadow-inner">
+                  <img
+                    src="/logo.png"
+                    alt="Caplos Mascot"
+                    className="w-full h-full object-contain p-2 hover:scale-105 transition-transform duration-300"
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <div className="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-caplos-yellow text-caplos-navy font-black text-xs">
+                    ⭐ BELAJAR JADI ASYIK
+                  </div>
+                  <h3 className="font-black text-lg text-caplos-navy">Halo, Aku Caplos!</h3>
+                  <p className="text-xs text-caplos-navy-600 font-medium">
+                    Siap membantu Guru membuat soal berkualitas dan mendampingi Siswa belajar dengan ceria!
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
       </section>
 
-      {/* Feature Highlights Grid */}
-      <section className="grid grid-cols-1 md:grid-cols-3 gap-6 pt-6">
-        <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-xs space-y-3">
-          <div className="w-12 h-12 rounded-xl bg-indigo-100 text-indigo-600 flex items-center justify-center">
-            <Zap className="w-6 h-6" />
-          </div>
-          <h3 className="text-lg font-bold text-slate-900">Gemini Flash Vision OCR</h3>
-          <p className="text-sm text-slate-600">
-            Strict transcription mode extracts text, multiple-choice options, answer keys, and crops diagram images directly from scanned PDF pages.
+      {/* 3 Core Pillars Section */}
+      <section className="space-y-6">
+        <div className="text-center space-y-2 max-w-2xl mx-auto">
+          <span className="text-xs font-bold uppercase tracking-wider text-caplos-blue bg-caplos-blue-50 px-3 py-1 rounded-full">
+            Fitur Unggulan
+          </span>
+          <h2 className="text-2xl sm:text-3xl font-black text-caplos-navy">
+            Mengapa Memilih Caplos untuk Sekolah Anda?
+          </h2>
+          <p className="text-sm text-caplos-navy-600">
+            Didesain khusus untuk menyatukan kemudahan kerja guru dengan antusiasme belajar siswa.
           </p>
         </div>
 
-        <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-xs space-y-3">
-          <div className="w-12 h-12 rounded-xl bg-purple-100 text-purple-600 flex items-center justify-center">
-            <Play className="w-6 h-6" />
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          {/* Pillar 1: Multimodal PDF Vision */}
+          <div className="bg-white p-7 rounded-3xl border-2 border-caplos-blue/20 shadow-xs hover:shadow-md transition space-y-4 flex flex-col justify-between">
+            <div className="space-y-3">
+              <div className="w-12 h-12 rounded-2xl bg-caplos-blue text-white flex items-center justify-center shadow-md shadow-caplos-blue/20">
+                <Zap className="w-6 h-6 text-caplos-yellow" />
+              </div>
+              <h3 className="text-xl font-bold text-caplos-navy">
+                Ekstraksi PDF Multimodal Cerdas
+              </h3>
+              <p className="text-sm text-caplos-navy-600 leading-relaxed">
+                Bukan cuma teks! Diagram soal dan pilihan jawaban bergambar otomatis dipotong dengan presisi dari file PDF Anda tanpa perlu screenshot manual.
+              </p>
+            </div>
+            <div className="pt-3 border-t border-slate-100 flex items-center text-xs font-bold text-caplos-blue">
+              <span>Didukung Gemini Flash Vision</span>
+            </div>
           </div>
-          <h3 className="text-lg font-bold text-slate-900">Quizizz-Style Student Experience</h3>
-          <p className="text-sm text-slate-600">
-            One question at a time runner with progress bar, instant color-coded feedback, chime sound effects, and detailed explanation reveals.
-          </p>
-        </div>
 
-        <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-xs space-y-3">
-          <div className="w-12 h-12 rounded-xl bg-pink-100 text-pink-600 flex items-center justify-center">
-            <CheckCircle2 className="w-6 h-6" />
+          {/* Pillar 2: 11 Interactive Question Types */}
+          <div className="bg-white p-7 rounded-3xl border-2 border-caplos-yellow/40 shadow-xs hover:shadow-md transition space-y-4 flex flex-col justify-between">
+            <div className="space-y-3">
+              <div className="w-12 h-12 rounded-2xl bg-caplos-yellow text-caplos-navy flex items-center justify-center shadow-md shadow-caplos-yellow/20">
+                <Layers className="w-6 h-6 text-caplos-navy" />
+              </div>
+              <h3 className="text-xl font-bold text-caplos-navy">
+                11 Tipe Soal Gamifikasi Interaktif
+              </h3>
+              <p className="text-sm text-caplos-navy-600 leading-relaxed">
+                Menjodohkan Drag & Drop 1-to-1, Urutan Tap-to-Swap anak SD, Isian Rumpang multi-blank, hingga Hotspot gambar interaktif yang anti-bosan.
+              </p>
+            </div>
+            <div className="pt-3 border-t border-slate-100 flex items-center text-xs font-bold text-caplos-yellow-700">
+              <span>Siswa Lebih Antusias Mengerjakan</span>
+            </div>
           </div>
-          <h3 className="text-lg font-bold text-slate-900">Persistent Analytics & CSV Export</h3>
-          <p className="text-sm text-slate-600">
-            All quizzes and student submissions stored persistently in Supabase PostgreSQL. Teachers can track scores and export grades to CSV.
+
+          {/* Pillar 3: Kid-Friendly Typography & Analytics */}
+          <div className="bg-white p-7 rounded-3xl border-2 border-caplos-navy/20 shadow-xs hover:shadow-md transition space-y-4 flex flex-col justify-between">
+            <div className="space-y-3">
+              <div className="w-12 h-12 rounded-2xl bg-caplos-navy text-white flex items-center justify-center shadow-md shadow-caplos-navy/20">
+                <BookOpen className="w-6 h-6 text-caplos-yellow" />
+              </div>
+              <h3 className="text-xl font-bold text-caplos-navy">
+                Tipografi Ramah Anak SD & Analitik
+              </h3>
+              <p className="text-sm text-caplos-navy-600 leading-relaxed">
+                Teks wacana cerita panjang otomatis ditata dalam kartu bacaan hangat lapang. Nilai dan rekap jawaban siswa tersimpan rapi dan aman.
+              </p>
+            </div>
+            <div className="pt-3 border-t border-slate-100 flex items-center text-xs font-bold text-caplos-navy">
+              <span>Bebas Tembok Teks Melelahkan</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Call to Action Banner */}
+      <section className="bg-caplos-navy rounded-3xl p-8 sm:p-12 text-white text-center space-y-6 shadow-xl relative overflow-hidden">
+        <div className="relative z-10 max-w-2xl mx-auto space-y-4">
+          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-caplos-yellow text-caplos-navy font-extrabold text-xs">
+            ✨ SIAP DALAM 1 MENIT
+          </span>
+          <h2 className="text-3xl sm:text-4xl font-black tracking-tight">
+            Mulai Buat Kuis Interaktif Pertama Anda
+          </h2>
+          <p className="text-caplos-navy-200 text-sm sm:text-base leading-relaxed">
+            Tinggalkan cara lama yang memakan waktu. Manfaatkan kecerdasan AI Caplos untuk asesmen pembelajaran yang lebih personal dan bermakna.
           </p>
+          <div className="pt-2 flex flex-col sm:flex-row items-center justify-center gap-4">
+            <Link
+              href="/admin/create"
+              className="w-full sm:w-auto px-8 py-4 rounded-2xl bg-caplos-yellow text-caplos-navy font-black shadow-lg hover:bg-caplos-yellow-600 transition flex items-center justify-center gap-2 cursor-pointer text-base"
+            >
+              <Upload className="w-5 h-5 text-caplos-navy" />
+              <span>Buat Soal Sekarang</span>
+            </Link>
+            <Link
+              href="/admin/quizzes"
+              className="w-full sm:w-auto px-7 py-4 rounded-2xl bg-white/10 hover:bg-white/20 text-white font-bold border border-white/20 transition flex items-center justify-center gap-2 cursor-pointer text-base"
+            >
+              <BarChart3 className="w-5 h-5 text-caplos-yellow" />
+              <span>Lihat Kuis Saya</span>
+            </Link>
+          </div>
         </div>
       </section>
     </div>

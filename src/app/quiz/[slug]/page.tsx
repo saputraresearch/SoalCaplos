@@ -1097,14 +1097,19 @@ export default function StudentQuizPage() {
   if (!quizStarted) {
     return (
       <div className="max-w-xl mx-auto my-8 bg-white p-8 rounded-3xl border border-slate-200 shadow-lg space-y-6 animate-pop">
-        <div className="text-center space-y-2">
-          <div className="w-16 h-16 bg-gradient-to-tr from-indigo-600 to-purple-600 text-white rounded-2xl flex items-center justify-center mx-auto shadow-md">
-            <Sparkles className="w-8 h-8" />
+        <div className="text-center space-y-3">
+          <div className="w-20 h-20 rounded-3xl overflow-hidden shadow-md border-2 border-caplos-blue bg-white flex items-center justify-center mx-auto transition-transform hover:scale-105">
+            <img src="/logo.png" alt="Caplos Mascot" className="w-full h-full object-cover" />
           </div>
-          <h1 className="text-2xl font-black text-slate-900 pt-2">{quiz.title}</h1>
-          <p className="text-sm text-slate-500">
-            {questions.length} Question{questions.length !== 1 ? "s" : ""} • Interactive Self-Paced Quiz
-          </p>
+          <div>
+            <div className="inline-flex items-center gap-1.5 px-3 py-0.5 rounded-full text-xs font-bold bg-caplos-yellow/20 text-caplos-navy border border-caplos-yellow/50 mb-1">
+              <span>Caplos Learning Quiz</span>
+            </div>
+            <h1 className="text-2xl font-black text-caplos-navy pt-1">{quiz.title}</h1>
+            <p className="text-sm text-caplos-navy-500 font-medium">
+              {questions.length} Butir Soal • Kuis Interaktif Mandiri
+            </p>
+          </div>
         </div>
 
         {quiz.status === "draft" && (
@@ -1123,7 +1128,7 @@ export default function StudentQuizPage() {
                 type="button"
                 onClick={handlePublishNow}
                 disabled={isPublishingFromRunner}
-                className="px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs shadow-xs transition flex items-center justify-center gap-1.5 shrink-0 cursor-pointer disabled:opacity-50"
+                className="px-3.5 py-2 rounded-xl bg-caplos-blue hover:bg-caplos-blue-600 text-white font-bold text-xs shadow-xs transition flex items-center justify-center gap-1.5 shrink-0 cursor-pointer disabled:opacity-50"
               >
                 {isPublishingFromRunner ? (
                   <>
@@ -1132,7 +1137,7 @@ export default function StudentQuizPage() {
                   </>
                 ) : (
                   <>
-                    <Sparkles className="w-3.5 h-3.5" />
+                    <Sparkles className="w-3.5 h-3.5 text-caplos-yellow" />
                     <span>Publikasikan Sekarang</span>
                   </>
                 )}
@@ -1149,8 +1154,8 @@ export default function StudentQuizPage() {
           className="space-y-4"
         >
           <div>
-            <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-1">
-              Enter Your Name / Nama Lengkap
+            <label className="block text-xs font-bold uppercase tracking-wider text-caplos-navy-600 mb-1.5">
+              Masukkan Nama Lengkap Siswa
             </label>
             <div className="relative">
               <User className="w-5 h-5 text-slate-400 absolute left-3.5 top-3.5" />
@@ -1159,8 +1164,8 @@ export default function StudentQuizPage() {
                 required
                 value={studentName}
                 onChange={(e) => setStudentName(e.target.value)}
-                placeholder="e.g. Budi Pratama"
-                className="w-full pl-11 pr-4 py-3 rounded-xl border border-slate-300 text-slate-900 font-medium focus:ring-2 focus:ring-indigo-500 focus:outline-hidden"
+                placeholder="Contoh: Budi Pratama"
+                className="w-full pl-11 pr-4 py-3.5 rounded-2xl border border-slate-300 text-caplos-navy font-semibold focus:ring-2 focus:ring-caplos-blue focus:border-caplos-blue focus:outline-hidden text-base shadow-xs"
               />
             </div>
           </div>
@@ -1168,10 +1173,10 @@ export default function StudentQuizPage() {
           <button
             type="submit"
             disabled={!studentName.trim()}
-            className="w-full py-4 rounded-xl bg-indigo-600 text-white font-bold text-lg shadow-lg hover:bg-indigo-700 disabled:opacity-50 transition flex items-center justify-center gap-2"
+            className="w-full py-4 rounded-2xl bg-caplos-blue text-white font-black text-lg shadow-lg shadow-caplos-blue/30 hover:bg-caplos-blue-600 disabled:opacity-50 transition flex items-center justify-center gap-2 cursor-pointer"
           >
-            <span>Start Quiz</span>
-            <ArrowRight className="w-5 h-5" />
+            <span>Mulai Kuis</span>
+            <ArrowRight className="w-5 h-5 text-caplos-yellow" />
           </button>
         </form>
       </div>
@@ -1188,7 +1193,7 @@ export default function StudentQuizPage() {
           <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl text-amber-800 text-xs font-semibold flex items-center justify-between gap-2 shadow-xs">
             <div className="flex items-center gap-2">
               <span>⚠️</span>
-              <span>Teacher Preview Mode: This quiz is currently saved as a draft.</span>
+              <span>Teacher Preview Mode: Kuis ini tersimpan sebagai draft.</span>
             </div>
             <span className="px-2 py-0.5 rounded-full bg-amber-200 text-amber-900 text-[10px] font-bold uppercase tracking-wider">
               Draft
@@ -1196,26 +1201,26 @@ export default function StudentQuizPage() {
           </div>
         )}
 
-        <div className="w-20 h-20 bg-gradient-to-tr from-amber-400 to-yellow-500 text-white rounded-full flex items-center justify-center mx-auto shadow-lg">
-          <Trophy className="w-10 h-10" />
+        <div className="w-20 h-20 bg-gradient-to-tr from-caplos-yellow-400 to-caplos-yellow text-caplos-navy rounded-full flex items-center justify-center mx-auto shadow-lg border-2 border-caplos-yellow-200">
+          <Trophy className="w-10 h-10 text-caplos-navy" />
         </div>
 
         <div className="space-y-1">
-          <h2 className="text-3xl font-black text-slate-900">Quiz Completed!</h2>
-          <p className="text-slate-500 text-sm">Great job, {studentName}!</p>
+          <h2 className="text-3xl font-black text-caplos-navy">Kuis Selesai!</h2>
+          <p className="text-caplos-navy-600 text-sm font-medium">Hebat sekali, {studentName}!</p>
         </div>
 
         <div className="grid grid-cols-2 gap-4">
-          <div className="p-4 bg-indigo-50 border border-indigo-100 rounded-2xl">
-            <span className="block text-xs font-bold uppercase text-indigo-500">Score</span>
-            <span className="text-3xl font-black text-indigo-700">
+          <div className="p-4 bg-caplos-blue-50 border border-caplos-blue-200 rounded-2xl">
+            <span className="block text-xs font-bold uppercase text-caplos-blue-700">Skor Kamu</span>
+            <span className="text-3xl font-black text-caplos-blue">
               {score} / {questions.length}
             </span>
           </div>
 
-          <div className="p-4 bg-purple-50 border border-purple-100 rounded-2xl">
-            <span className="block text-xs font-bold uppercase text-purple-500">Accuracy</span>
-            <span className="text-3xl font-black text-purple-700">{accuracy}%</span>
+          <div className="p-4 bg-caplos-yellow-50 border border-caplos-yellow-200 rounded-2xl">
+            <span className="block text-xs font-bold uppercase text-caplos-yellow-700">Akurasi</span>
+            <span className="text-3xl font-black text-caplos-navy">{accuracy}%</span>
           </div>
         </div>
 

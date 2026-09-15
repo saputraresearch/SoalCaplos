@@ -112,42 +112,49 @@ export default function AdminQuizzesListPage() {
 
   return (
     <div className="max-w-5xl mx-auto space-y-8 py-4">
-      <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-4 border-b border-slate-200 pb-4">
+      <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-4 border-b border-slate-200/80 pb-4">
         <div>
-          <h1 className="text-3xl font-extrabold text-slate-900 tracking-tight">
-            Teacher Quiz Dashboard
-          </h1>
-          <p className="text-slate-600 mt-1">
-            Manage created quizzes, edit questions, inspect student scores, or copy shareable links.
+          <div className="flex items-center gap-2">
+            <h1 className="text-3xl font-black text-caplos-navy tracking-tight">
+              Dashboard Kuis Guru
+            </h1>
+            <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-caplos-blue-50 text-caplos-blue border border-caplos-blue-200">
+              Caplos
+            </span>
+          </div>
+          <p className="text-caplos-navy-600 mt-1 text-sm font-medium">
+            Kelola kuis, edit butir soal, salin link tugas siswa, dan pantau rekap nilai.
           </p>
         </div>
 
         <Link
           href="/admin/create"
-          className="px-5 py-3 rounded-xl bg-indigo-600 text-white font-semibold flex items-center gap-2 hover:bg-indigo-700 transition shadow-md shrink-0"
+          className="px-5 py-3 rounded-2xl bg-caplos-blue text-white font-bold flex items-center gap-2 hover:bg-caplos-blue-600 transition shadow-md shadow-caplos-blue/20 shrink-0"
         >
-          <Plus className="w-5 h-5" />
-          <span>Create New Quiz</span>
+          <Plus className="w-5 h-5 text-caplos-yellow" />
+          <span>Buat Kuis Baru</span>
         </Link>
       </div>
 
       {loading ? (
         <div className="flex items-center justify-center py-12">
-          <Loader2 className="w-8 h-8 text-indigo-600 animate-spin" />
+          <Loader2 className="w-8 h-8 text-caplos-blue animate-spin" />
         </div>
       ) : quizzes.length === 0 ? (
-        <div className="bg-white p-12 rounded-2xl border border-slate-200 text-center space-y-4 shadow-xs">
-          <FileText className="w-12 h-12 text-slate-400 mx-auto" />
-          <h3 className="text-xl font-bold text-slate-800">No Quizzes Created Yet</h3>
-          <p className="text-sm text-slate-500 max-w-sm mx-auto">
-            Upload your first scanned PDF exam sheet to automatically generate an interactive quiz.
+        <div className="bg-white p-12 rounded-3xl border border-slate-200 text-center space-y-4 shadow-xs">
+          <div className="w-16 h-16 rounded-2xl bg-caplos-blue-50 text-caplos-blue flex items-center justify-center mx-auto">
+            <FileText className="w-8 h-8" />
+          </div>
+          <h3 className="text-xl font-bold text-caplos-navy">Belum Ada Kuis yang Dibuat</h3>
+          <p className="text-sm text-caplos-navy-600 max-w-sm mx-auto">
+            Unggah lembar ujian PDF pertama Anda untuk mengekstrak soal otomatis dengan AI Caplos.
           </p>
           <Link
             href="/admin/create"
-            className="inline-flex items-center gap-2 px-6 py-3 rounded-xl bg-indigo-600 text-white font-semibold hover:bg-indigo-700 transition shadow-md"
+            className="inline-flex items-center gap-2 px-6 py-3.5 rounded-2xl bg-caplos-blue text-white font-bold hover:bg-caplos-blue-600 transition shadow-md shadow-caplos-blue/20"
           >
-            <Plus className="w-4 h-4" />
-            <span>Create Quiz Now</span>
+            <Plus className="w-4 h-4 text-caplos-yellow" />
+            <span>Mulai Buat Kuis Sekarang</span>
           </Link>
         </div>
       ) : (
@@ -158,16 +165,16 @@ export default function AdminQuizzesListPage() {
             return (
               <div
                 key={q.id}
-                className="bg-white p-6 rounded-2xl border border-slate-200 shadow-xs hover:shadow-md transition space-y-4 flex flex-col justify-between"
+                className="bg-white p-6 rounded-3xl border border-slate-200/80 shadow-xs hover:shadow-md transition space-y-4 flex flex-col justify-between"
               >
                 <div className="space-y-2">
                   <div className="flex items-start justify-between gap-2">
-                    <h3 className="text-xl font-bold text-slate-900 leading-tight">
+                    <h3 className="text-lg font-bold text-caplos-navy leading-snug">
                       {q.title}
                     </h3>
-                    <span className="inline-flex items-center gap-1 text-xs font-bold text-indigo-700 bg-indigo-50 px-2.5 py-1 rounded-full shrink-0">
+                    <span className="inline-flex items-center gap-1 text-xs font-bold text-caplos-blue bg-caplos-blue-50 px-2.5 py-1 rounded-full shrink-0 border border-caplos-blue-100">
                       <Users className="w-3.5 h-3.5" />
-                      <span>{count} Submissions</span>
+                      <span>{count} Siswa</span>
                     </span>
                   </div>
 
@@ -176,13 +183,13 @@ export default function AdminQuizzesListPage() {
                       <button
                         onClick={() => handleToggleStatus(q.id, "draft")}
                         disabled={updatingStatusId === q.id}
-                        className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full font-bold bg-amber-100 hover:bg-amber-200 text-amber-800 border border-amber-300 transition cursor-pointer"
+                        className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full font-bold bg-caplos-yellow/20 hover:bg-caplos-yellow/30 text-caplos-navy border border-caplos-yellow/60 transition cursor-pointer"
                         title="Klik untuk mempublikasikan kuis agar siswa dapat mengerjakan"
                       >
                         {updatingStatusId === q.id ? (
-                          <Loader2 className="w-3 h-3 animate-spin text-amber-700" />
+                          <Loader2 className="w-3 h-3 animate-spin text-caplos-yellow-700" />
                         ) : (
-                          <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
+                          <span className="w-2 h-2 rounded-full bg-caplos-yellow-600 animate-pulse" />
                         )}
                         <span>Draft (Klik untuk Publish)</span>
                       </button>
@@ -201,10 +208,10 @@ export default function AdminQuizzesListPage() {
                         <span>Published (Aktif)</span>
                       </button>
                     )}
-                    <span className="text-slate-400">•</span>
+                    <span className="text-slate-300">•</span>
                     <span className="text-slate-500 flex items-center gap-1">
                       <Calendar className="w-3.5 h-3.5 text-slate-400" />
-                      <span>{new Date(q.created_at).toLocaleDateString()}</span>
+                      <span>{new Date(q.created_at).toLocaleDateString("id-ID")}</span>
                     </span>
                   </div>
                 </div>
@@ -213,17 +220,17 @@ export default function AdminQuizzesListPage() {
                   <div className="flex items-center gap-2">
                     <button
                       onClick={() => handleCopy(q.slug, q.id)}
-                      className="px-3 py-1.5 rounded-lg bg-slate-100 text-slate-700 text-xs font-semibold flex items-center gap-1.5 hover:bg-slate-200 transition"
+                      className="px-3 py-1.5 rounded-xl bg-slate-100 text-caplos-navy text-xs font-semibold flex items-center gap-1.5 hover:bg-slate-200 transition cursor-pointer"
                     >
                       {copiedId === q.id ? (
                         <>
                           <Check className="w-3.5 h-3.5 text-emerald-600" />
-                          <span className="text-emerald-700">Copied!</span>
+                          <span className="text-emerald-700 font-bold">Tersalin!</span>
                         </>
                       ) : (
                         <>
                           <Copy className="w-3.5 h-3.5 text-slate-500" />
-                          <span>Copy Link</span>
+                          <span>Salin Link</span>
                         </>
                       )}
                     </button>
@@ -232,10 +239,10 @@ export default function AdminQuizzesListPage() {
                       <button
                         onClick={() => handleToggleStatus(q.id, "draft")}
                         disabled={updatingStatusId === q.id}
-                        className="px-2.5 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold flex items-center gap-1 shadow-xs transition"
+                        className="px-3 py-1.5 rounded-xl bg-caplos-blue hover:bg-caplos-blue-600 text-white text-xs font-bold flex items-center gap-1 shadow-xs transition cursor-pointer"
                         title="Publikasikan kuis agar siswa melihat versi resmi (bukan Teacher Preview)"
                       >
-                        <Sparkles className="w-3.5 h-3.5" />
+                        <Sparkles className="w-3.5 h-3.5 text-caplos-yellow" />
                         <span>Publikasikan</span>
                       </button>
                     )}
@@ -245,8 +252,8 @@ export default function AdminQuizzesListPage() {
                     {/* Edit Quiz */}
                     <Link
                       href={`/admin/quizzes/${q.id}/edit`}
-                      className="p-2 rounded-lg text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 transition"
-                      title="Edit Quiz Questions"
+                      className="p-2 rounded-xl text-slate-500 hover:text-caplos-blue hover:bg-caplos-blue-50 transition"
+                      title="Edit Soal Kuis"
                     >
                       <Edit className="w-4 h-4" />
                     </Link>
@@ -255,8 +262,8 @@ export default function AdminQuizzesListPage() {
                     <Link
                       href={`/quiz/${q.slug}`}
                       target="_blank"
-                      className="p-2 rounded-lg text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 transition"
-                      title="Preview Quiz as Student"
+                      className="p-2 rounded-xl text-slate-500 hover:text-caplos-blue hover:bg-caplos-blue-50 transition"
+                      title="Pratinjau Kuis Sebagai Siswa"
                     >
                       <ExternalLink className="w-4 h-4" />
                     </Link>
@@ -264,18 +271,18 @@ export default function AdminQuizzesListPage() {
                     {/* View Results */}
                     <Link
                       href={`/admin/quizzes/${q.id}/results`}
-                      className="px-3 py-1.5 rounded-lg bg-indigo-50 text-indigo-700 text-xs font-bold flex items-center gap-1 hover:bg-indigo-100 transition"
+                      className="px-3 py-1.5 rounded-xl bg-caplos-blue-50 text-caplos-blue text-xs font-bold flex items-center gap-1 hover:bg-caplos-blue-100 transition border border-caplos-blue-200/60"
                     >
                       <BarChart3 className="w-3.5 h-3.5" />
-                      <span>Results</span>
+                      <span>Hasil</span>
                     </Link>
 
                     {/* Delete Quiz */}
                     <button
                       onClick={() => handleDeleteQuiz(q.id, q.title)}
                       disabled={deletingId === q.id}
-                      className="p-2 rounded-lg text-slate-400 hover:text-red-600 hover:bg-red-50 transition disabled:opacity-50"
-                      title="Delete Quiz"
+                      className="p-2 rounded-xl text-slate-400 hover:text-red-600 hover:bg-red-50 transition disabled:opacity-50 cursor-pointer"
+                      title="Hapus Kuis"
                     >
                       <Trash2 className="w-4 h-4" />
                     </button>

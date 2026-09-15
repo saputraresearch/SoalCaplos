@@ -4,7 +4,12 @@
 
 :root {
   --background: #f8fafc;
-  --foreground: #0f172a;
+  --foreground: #102A43;
+}
+
+::selection {
+  background-color: #BBDEFB;
+  color: #102A43;
 }
 
 body {
