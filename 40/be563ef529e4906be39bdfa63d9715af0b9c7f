@@ -1,0 +1,14 @@
+src/app/quiz/[slug]/page.tsx
+  h_7310902349a227 146-159,162,165,170,172,175-177,181,183-184,186-190,194-211,213-257,261-271,273-275,1239-1278,1445-1451
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "40be563ef529e4906be39bdfa63d9715af0b9c7f",
+  "prompts": {},
+  "humans": {
+    "h_7310902349a227": {
+      "author": "saputra.a.pratama <saputra.a.pratama@gdn-commerce.com>"
+    }
+  }
+}
