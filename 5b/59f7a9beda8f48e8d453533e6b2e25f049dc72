@@ -1,0 +1,18 @@
+next.config.mjs
+  h_7310902349a227 12
+package.json
+  h_7310902349a227 21
+src/lib/pdfTextExtractor.ts
+  h_7310902349a227 3,12,16-22,24-26,28-37,39-50,52-76,78-85
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "5b59f7a9beda8f48e8d453533e6b2e25f049dc72",
+  "prompts": {},
+  "humans": {
+    "h_7310902349a227": {
+      "author": "saputra.a.pratama <saputra.a.pratama@gdn-commerce.com>"
+    }
+  }
+}
