@@ -1,0 +1,24 @@
+scripts/test-continuation-extraction.mjs
+  h_7310902349a227 1-109
+src/app/admin/create/page.tsx
+  h_7310902349a227 24-25,37-41,65-68,72,76,188-252,334-335,361-364,380,384,457-464,487,490,873-892,894-921,924-977,980-985,987-1061,1064-1065,1324-1366
+src/app/api/continue-extraction/route.ts
+  h_7310902349a227 1-116
+src/app/api/parse-pdf/route.ts
+  h_7310902349a227 465-478,484-485
+src/lib/clientAiExtractor.ts
+  h_7310902349a227 210,347-348,511-512,547-548,589-590,602-682
+src/lib/groqClient.ts
+  h_7310902349a227 89-90,129-136,142-147,152,197-229,345-389
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "a905714f03122c581d5337599a30f7554a22588d",
+  "prompts": {},
+  "humans": {
+    "h_7310902349a227": {
+      "author": "saputra.a.pratama <saputra.a.pratama@gdn-commerce.com>"
+    }
+  }
+}
