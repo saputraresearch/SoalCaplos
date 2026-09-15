@@ -1,0 +1,16 @@
+src/app/api/parse-pdf/route.ts
+  h_7310902349a227 5,149-182,201-222
+src/lib/pdfTextExtractor.ts
+  h_7310902349a227 1-59
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "3b665f3711537d3433cb1d22911e8c09607d90e2",
+  "prompts": {},
+  "humans": {
+    "h_7310902349a227": {
+      "author": "saputra.a.pratama <saputra.a.pratama@gdn-commerce.com>"
+    }
+  }
+}
