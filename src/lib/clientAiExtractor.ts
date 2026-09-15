@@ -4,17 +4,39 @@
  * Eliminates Vercel data center IP blocks, network timeouts, and AWS rate-limiting.
  */
 
-export const SYSTEM_PARSE_PROMPT = `Act strictly as an expert document transcriber, exam parser, and question type detector.
-Extract EVERY SINGLE QUESTION and option from the uploaded document exactly as written.
+export const SYSTEM_PARSE_PROMPT = `Act as an expert math teacher, document transcriber, exam parser, and master problem solver.
+Extract EVERY SINGLE QUESTION and option from the uploaded document exactly as written, and SOLVE every question to provide the accurate answer key and explanation.
 
 ================================================================================
-ATURAN UTAMA & WAJIB: KELENGKAPAN BUTIR SOAL (EXTRACT ALL QUESTIONS WITHOUT EXCEPTION)
+ATURAN 1: WAJIB MENENTUKAN KUNCI JAWABAN & PEMBAHASAN AKURAT (AI PROBLEM SOLVER)
+================================================================================
+Dokumen ini adalah naskah ujian siswa yang TIDAK memuat kunci jawaban tercetak.
+OLEH KARENA ITU, KAMU SEBAGAI AI WAJIB MENYELESAIKAN/MENGERJAKAN SETIAP BUTIR SOAL DENGAN TELITI!
+1. Untuk Pilihan Ganda (MULTIPLE_CHOICE):
+   - Hitung dan selesaikan pertanyaan secara matematis dan logis.
+   - Cocokkan jawaban hasil perhitunganmu dengan opsi A, B, C, D yang ada.
+   - Tentukan "correct_answer_index" secara akurat:
+     * 0 jika kunci jawabannya A
+     * 1 jika kunci jawabannya B
+     * 2 jika kunci jawabannya C
+     * 3 jika kunci jawabannya D
+   - DILARANG SELALU MENGISI 0! Kunci jawaban harus bervariasi (bisa A, B, C, atau D) sesuai hasil perhitungan matematika yang benar!
+   - Wajib isi "explanation" dengan langkah perhitungan singkat (1-2 kalimat).
+
+2. Untuk Isian Singkat (FILL_IN_THE_BLANKS):
+   - Selesaikan pertanyaan dan isi "blanks_keywords" dengan jawaban akhir yang benar (misal: ["6x - 7", "6x-7"]).
+   - Tuliskan langkah perhitungan di "explanation".
+
+3. Untuk Pilihan Ganda Kompleks (MULTIPLE_SELECT):
+   - Tentukan seluruh opsi yang benar dan masukkan indeksnya ke "correct_answers" (misal: [0, 2]).
+
+================================================================================
+ATURAN 2: KELENGKAPAN BUTIR SOAL & LARANGAN MENYELIPKAN TEKS PETUNJUK
 ================================================================================
 1. WAJIB EKSTRAK SEMUA BUTIR SOAL DARI AWAL HINGGA AKHIR DOKUMEN TANPA TERLEWAT SATUPUN!
 2. JIKA DOKUMEN BERISI 20 BUTIR SOAL (Soal No. 1 s/d 20), ARRAY "questions" WAJIB MEMILIKI TEPAT 20 OBJEK SOAL!
-3. DILARANG KERAS MEMOTONG, MENYINGKAT, ATAU HANYA MENGAMBIL SEBAGIAN KECIL SOAL (1-4 NOMOR) SEBAGAI CONTOH!
-4. Telusuri teks dari baris pertama sampai baris terakhir. Setiap kali ada nomor soal (misal "1.", "2.", "3.", dst.), buatkan objek soal tersendiri.
-5. Jangan pernah berhenti sebelum semua nomor soal di dokumen selesai diekstrak!
+3. DILARANG KERAS MEMASUKKAN TEKS PETUNJUK/HEADER DOKUMEN (misal: "Pilihlah salah satu jawaban", "Petunjuk Umum", dsb.) sebagai butir soal! Hanya ekstrak soal yang memiliki nomor dan pertanyaan riil.
+4. Jangan pernah berhenti sebelum semua nomor soal di dokumen selesai diekstrak!
 
 PANDUAN DETEKSI TIPE SOAL:
 1. JIKA SOAL ISIAN SINGKAT / ISIAN RUMPANG:
@@ -56,7 +78,7 @@ Return JSON in this EXACT structure:
       "correct_answer_index": 0,
       "correct_answers": [0],
       "blanks_keywords": ["kunci_isian"],
-      "explanation": "Pembahasan atau kunci jawaban jika tertulis di dokumen"
+      "explanation": "Langkah penyelesaian ringkas dan kunci jawaban"
     }
   ]
 }`;
@@ -108,23 +130,71 @@ function normalizeRawQuestions(rawQuestions: any[]): any[] {
   });
 }
 
-function deduplicateQuestions(questions: any[]): any[] {
+function extractQuestionNumber(text: string): number | null {
+  const m = text.match(/^(?:(?:No\.?|Soal)\s*)?\(?(\d{1,2})\)?[\.\:\)\s]/i);
+  return m ? parseInt(m[1], 10) : null;
+}
+
+function isInstructionHeader(text: string): boolean {
+  const lower = text.toLowerCase().trim();
+  return (
+    lower.startsWith("petunjuk") ||
+    lower.startsWith("pilihlah salah satu") ||
+    lower.startsWith("pilihlah jawaban") ||
+    lower.startsWith("berilah tanda silang") ||
+    lower.startsWith("jawablah pertanyaan") ||
+    lower.startsWith("isilah titik-titik") ||
+    lower.startsWith("kerjakan soal-soal") ||
+    lower.startsWith("bab ") ||
+    lower.startsWith("ulangan ") ||
+    lower.startsWith("penilaian ") ||
+    lower.includes("alokasi waktu") ||
+    lower.includes("tahun ajaran") ||
+    lower.includes("mata pelajaran :")
+  );
+}
+
+function deduplicateQuestions(questions: any[], expectedTotal = 0): any[] {
   const seenTexts = new Set<string>();
+  const seenNumbers = new Set<number>();
   const unique: any[] = [];
 
   for (const q of questions) {
     const rawText = (q.question_text || "").trim();
-    // Normalize question text for duplicate detection (remove numbering like "1. ")
+    if (!rawText || isInstructionHeader(rawText)) {
+      continue;
+    }
+
+    const num = extractQuestionNumber(rawText);
     const normalized = rawText
-      .replace(/^(?:No\.?\s*)?\d{1,2}[\.\)\s]+/i, "")
+      .replace(/^(?:(?:No\.?|Soal)\s*)?\(?\d{1,2}\)?[\.\:\)\s]+/i, "")
       .toLowerCase()
-      .replace(/\s+/g, " ")
+      .replace(/[^a-z0-9]/g, "")
       .trim();
 
-    const key = normalized.length >= 5 ? normalized : rawText;
-    if (!seenTexts.has(key)) {
-      seenTexts.add(key);
-      unique.push(q);
+    // Check duplicate by question number (e.g. question #11 extracted twice)
+    if (num !== null && seenNumbers.has(num)) {
+      console.log(`[Deduplicate] Skipping duplicate question number #${num}`);
+      continue;
+    }
+
+    // Check duplicate by normalized text content
+    if (normalized.length >= 8 && seenTexts.has(normalized)) {
+      console.log(`[Deduplicate] Skipping duplicate text: ${rawText.slice(0, 30)}`);
+      continue;
+    }
+
+    if (num !== null) seenNumbers.add(num);
+    if (normalized.length >= 8) seenTexts.add(normalized);
+
+    unique.push(q);
+  }
+
+  // If there is still 1 extra item beyond expectedTotal (e.g. 21 vs 20)
+  if (expectedTotal > 0 && unique.length === expectedTotal + 1) {
+    const last = unique[unique.length - 1];
+    if (!last.options || last.options.length < 2 || (last.question_text && last.question_text.length < 15)) {
+      unique.pop();
     }
   }
 
@@ -317,7 +387,7 @@ export async function parseQuizWithClientDirect(options: {
       console.log(`[ClientDirect] Pass ${pass - 1} returned ${currentCount}/${expectedTotal} questions. Running continuation pass ${pass}...`);
 
       const nextStartNum = currentCount + 1;
-      const continuationPrompt = `DOKUMEN SUMBER UJIAN:\n\n${fullText}\n\n⚠️ INSTRUKSI LANJUTAN TAHAP ${pass} (SANGAT PENTING):\nPada tahap sebelumnya, baru diekstrak ${currentCount} butir soal (soal nomor 1 s/d nomor ${currentCount}).\nDokumen masih memiliki soal lanjutan mulai dari nomor ${nextStartNum} sampai nomor ${expectedTotal}.\nSekarang, EKSTRAK SELURUH SISA SOAL mulai dari nomor ${nextStartNum} hingga nomor ${expectedTotal} tanpa terlewat satupun!\nWajib kembalikan format JSON murni.`;
+      const continuationPrompt = `DOKUMEN SUMBER UJIAN:\n\n${fullText}\n\n⚠️ INSTRUKSI LANJUTAN TAHAP ${pass} (SANGAT PENTING):\nPada tahap sebelumnya, baru diekstrak ${currentCount} butir soal (soal nomor 1 s/d nomor ${currentCount}).\nDokumen masih memiliki soal lanjutan mulai dari nomor ${nextStartNum} sampai nomor ${expectedTotal}.\nSekarang, EKSTRAK SELURUH SISA SOAL mulai dari nomor ${nextStartNum} hingga nomor ${expectedTotal} tanpa terlewat satupun!\nWajib kerjakan/tentukan kunci jawabannya secara akurat dan kembalikan format JSON murni.`;
 
       const passRes = await callModelFn(continuationPrompt);
       if (passRes.success && Array.isArray(passRes.data?.questions) && passRes.data.questions.length > 0) {
@@ -329,7 +399,86 @@ export async function parseQuizWithClientDirect(options: {
       }
     }
 
-    return deduplicateQuestions(allQuestions);
+    return deduplicateQuestions(allQuestions, expectedTotal);
+  };
+
+  /**
+   * Auto-Solver Safeguard:
+   * If all multiple-choice questions still have default answer key 0 (A),
+   * run an AI mathematical solving pass to determine the accurate answer key for each question!
+   */
+  const ensureAnswerKeysProvided = async (
+    questionsList: any[],
+    callSolverFn: (prompt: string) => Promise<{ success: boolean; data?: any; error?: string }>
+  ): Promise<any[]> => {
+    const mcqs = questionsList.filter((q) => !q.question_type || q.question_type === "MULTIPLE_CHOICE");
+    if (mcqs.length === 0) return questionsList;
+
+    const allZero = mcqs.length >= 3 && mcqs.every((q) => q.correct_answer_index === 0);
+    if (!allZero) {
+      return questionsList;
+    }
+
+    console.log(`[ClientDirect] All ${mcqs.length} questions had default answer key A (0). Auto-solving with AI...`);
+    onStep?.({
+      id: "ai_solver",
+      label: "AI Solver Kunci Jawaban",
+      status: "success",
+      detail: `Menghitung dan menentukan kunci jawaban akurat untuk ${mcqs.length} butir soal...`,
+    });
+
+    const solvePrompt = `Kamu adalah guru matematika ahli. Selesaikan dan tentukan opsi mana (A, B, C, atau D) yang benar untuk setiap butir soal berikut:
+${mcqs
+  .map(
+    (q, i) =>
+      `[Soal ${i + 1}] ${q.question_text}\n${q.options.map((o: string, oi: number) => `  ${String.fromCharCode(65 + oi)}. ${o}`).join("\n")}`
+  )
+  .join("\n\n")}
+
+Kembalikan JSON dengan format:
+{
+  "solutions": [
+    {
+      "question_number": 1,
+      "correct_letter": "A" | "B" | "C" | "D",
+      "correct_index": 0 | 1 | 2 | 3,
+      "explanation": "Langkah pengerjaan matematika singkat (1-2 kalimat)"
+    }
+  ]
+}`;
+
+    try {
+      const res = await callSolverFn(solvePrompt);
+      if (res.success && Array.isArray(res.data?.solutions)) {
+        const solMap = new Map<number, { correct_index: number; explanation: string }>();
+        for (const sol of res.data.solutions) {
+          const num = typeof sol.question_number === "number" ? sol.question_number - 1 : -1;
+          if (num >= 0 && typeof sol.correct_index === "number") {
+            solMap.set(num, sol);
+          }
+        }
+
+        let mcqCount = 0;
+        return questionsList.map((q) => {
+          if (!q.question_type || q.question_type === "MULTIPLE_CHOICE") {
+            const found = solMap.get(mcqCount);
+            mcqCount++;
+            if (found) {
+              return {
+                ...q,
+                correct_answer_index: Math.min(Math.max(found.correct_index, 0), q.options.length - 1),
+                explanation: found.explanation || q.explanation,
+              };
+            }
+          }
+          return q;
+        });
+      }
+    } catch (err) {
+      console.warn("[ClientDirect] Auto-solver error:", err);
+    }
+
+    return questionsList;
   };
 
   // 1. If user explicitly prioritizes Groq
@@ -341,12 +490,15 @@ export async function parseQuizWithClientDirect(options: {
         rawQuestions = await completeMissingQuestions(rawQuestions, (p) =>
           callGroqDirectFromBrowser(p, validGroqKey, gModel)
         );
+        rawQuestions = await ensureAnswerKeysProvided(rawQuestions, (p) =>
+          callGroqDirectFromBrowser(p, validGroqKey, gModel)
+        );
 
         onStep?.({
           id: "groq_direct",
           label: "Groq AI (Koneksi Browser)",
           status: "success",
-          detail: `Berhasil mengekstrak ${rawQuestions.length} butir soal lengkap dengan model: ${res.model}`,
+          detail: `Berhasil mengekstrak ${rawQuestions.length} butir soal lengkap dengan kunci jawaban (Model: ${res.model})`,
         });
         return {
           success: true,
@@ -371,12 +523,15 @@ export async function parseQuizWithClientDirect(options: {
           rawQuestions = await completeMissingQuestions(rawQuestions, (p) =>
             callGeminiDirectFromBrowser(p, key, model)
           );
+          rawQuestions = await ensureAnswerKeysProvided(rawQuestions, (p) =>
+            callGeminiDirectFromBrowser(p, key, model)
+          );
 
           onStep?.({
             id: `gemini_direct_key${kIdx + 1}`,
             label: `Gemini AI (Koneksi Browser - Key #${kIdx + 1})`,
             status: "success",
-            detail: `Berhasil mengekstrak ${rawQuestions.length} butir soal lengkap dengan model: ${model}`,
+            detail: `Berhasil mengekstrak ${rawQuestions.length} butir soal lengkap dengan kunci jawaban (Model: ${model})`,
           });
 
           return {
@@ -409,12 +564,15 @@ export async function parseQuizWithClientDirect(options: {
         rawQuestions = await completeMissingQuestions(rawQuestions, (p) =>
           callGroqDirectFromBrowser(p, validGroqKey, gModel)
         );
+        rawQuestions = await ensureAnswerKeysProvided(rawQuestions, (p) =>
+          callGroqDirectFromBrowser(p, validGroqKey, gModel)
+        );
 
         onStep?.({
           id: "groq_direct",
           label: "Groq AI (Koneksi Browser)",
           status: "success",
-          detail: `Berhasil mengekstrak ${rawQuestions.length} butir soal lengkap dengan model: ${res.model}`,
+          detail: `Berhasil mengekstrak ${rawQuestions.length} butir soal lengkap dengan kunci jawaban (Model: ${res.model})`,
         });
         return {
           success: true,
